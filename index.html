@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="page_title">Custom Carb Mix — High Performance Fueling</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand" data-i18n="brand">PERFORMANCE FUEL</div>
+  <button id="langToggle" class="lang-btn">EN / ES</button>
+</header>
+
+<!-- HERO SURVEY -->
+<section id="survey" class="hero">
+  <div class="hero-inner">
+    <h1 data-i18n="hero_title">¿Cuál es tu mezcla de carbohidratos ideal?</h1>
+    <p data-i18n="hero_sub">Responde una encuesta rápida de 60 segundos y diseñamos tu mix personalizado, con tu nombre y una frase que te impulse en cada entrenamiento o carrera.</p>
+
+    <form id="surveyForm" class="survey-card">
+      <div class="step active" data-step="1">
+        <h2 data-i18n="q_name_h">Tu nombre de atleta</h2>
+        <input type="text" id="athleteName" data-i18n-placeholder="q_name_ph" placeholder="Ej. Mariana Torres" required>
+        <h2 data-i18n="q_purpose_h">¿Para qué vas a usar tu mix?</h2>
+        <div class="options" data-name="purpose">
+          <label><input type="radio" name="purpose" value="race" required> <span data-i18n="opt_race">Carrera / Competencia (ej. Ironman, maratón)</span></label>
+          <label><input type="radio" name="purpose" value="training"> <span data-i18n="opt_training">Entrenamiento diario</span></label>
+          <label><input type="radio" name="purpose" value="both"> <span data-i18n="opt_both">Ambos (pack doble: entreno + carrera)</span></label>
+        </div>
+        <input type="text" id="eventName" class="conditional" data-i18n-placeholder="q_event_ph" placeholder="Nombre del evento (ej. Ironman Cozumel)">
+      </div>
+
+      <div class="step" data-step="2">
+        <h2 data-i18n="q_intensity_h">¿Cuántas horas sueles entrenar o competir por sesión?</h2>
+        <div class="options" data-name="duration">
+          <label><input type="radio" name="duration" value="short" required> <span data-i18n="opt_short">Menos de 1 hora</span></label>
+          <label><input type="radio" name="duration" value="medium"> <span data-i18n="opt_medium">1–3 horas</span></label>
+          <label><input type="radio" name="duration" value="long"> <span data-i18n="opt_long">Más de 3 horas (resistencia / ultra)</span></label>
+        </div>
+        <h2 data-i18n="q_sweat_h">¿Cómo es tu nivel de sudoración o el clima donde entrenas?</h2>
+        <div class="options" data-name="climate">
+          <label><input type="radio" name="climate" value="low" required> <span data-i18n="opt_climate_low">Frío / sudo poco — necesito menos sodio</span></label>
+          <label><input type="radio" name="climate" value="medium"> <span data-i18n="opt_climate_med">Templado — sodio moderado</span></label>
+          <label><input type="radio" name="climate" value="high"> <span data-i18n="opt_climate_high">Calor / humedad / sudo mucho — necesito más sodio</span></label>
+        </div>
+      </div>
+
+      <div class="step" data-step="3">
+        <h2 data-i18n="q_caffeine_h">¿Tu tolerancia a la cafeína?</h2>
+        <div class="options" data-name="caffeine">
+          <label><input type="radio" name="caffeine" value="none" required> <span data-i18n="opt_caf_none">Prefiero sin cafeína</span></label>
+          <label><input type="radio" name="caffeine" value="low"> <span data-i18n="opt_caf_low">Un poco está bien (baja tolerancia)</span></label>
+          <label><input type="radio" name="caffeine" value="high"> <span data-i18n="opt_caf_high">Me encanta, alta tolerancia</span></label>
+          <label><input type="radio" name="caffeine" value="split"> <span data-i18n="opt_caf_split">Quiero un pack con cafeína y otro sin ella</span></label>
+        </div>
+        <h2 data-i18n="q_sugar_h">¿Tienes sensibilidad al azúcar o prefieres endulzantes naturales?</h2>
+        <div class="options" data-name="sugar">
+          <label><input type="radio" name="sugar" value="none" required> <span data-i18n="opt_sugar_none">No tengo problema con el azúcar regular</span></label>
+          <label><input type="radio" name="sugar" value="sensitive"> <span data-i18n="opt_sugar_sensitive">Soy sensible / prefiero menos azúcar</span></label>
+          <label><input type="radio" name="sugar" value="natural"> <span data-i18n="opt_sugar_natural">Prefiero endulzante natural (tipo miel)</span></label>
+        </div>
+      </div>
+
+      <div class="step" data-step="4">
+        <h2 data-i18n="q_flavor_h">¿Qué tipo de sabor prefieres?</h2>
+        <select id="flavor" data-name="flavor" required>
+          <option value="" data-i18n="select_choose">Selecciona un sabor…</option>
+          <option value="unflavored" data-i18n="fl_unflavored">Sin sabor (Unflavored)</option>
+          <option value="blue_raspberry">Blue Raspberry</option>
+          <option value="lemon_lime">Lemon Lime</option>
+          <option value="cherry" data-i18n="fl_cherry">Cherry (Cereza)</option>
+          <option value="pineapple" data-i18n="fl_pineapple">Pineapple (Piña)</option>
+          <option value="kiwi">Kiwi</option>
+          <option value="watermelon" data-i18n="fl_watermelon">Watermelon (Sandía)</option>
+          <option value="root_beer">Root Beer</option>
+          <option value="grape" data-i18n="fl_grape">Grape (Uva)</option>
+          <option value="green_apple" data-i18n="fl_green_apple">Green Apple (Manzana verde)</option>
+          <option value="mixed_berry" data-i18n="fl_mixed_berry">Mixed Berry (Mezcla de bayas)</option>
+          <option value="seagull">Spirit of The Seagull</option>
+          <option value="pina_colada">Piña Colada</option>
+          <option value="peach" data-i18n="fl_peach">Peach (Durazno)</option>
+          <option value="tangerine_natural">Tangerine — All Natural</option>
+          <option value="grape_natural">Grape — All Natural</option>
+          <option value="pineapple_natural">Pineapple — All Natural</option>
+          <option value="mango_natural">Mango — All Natural</option>
+          <option value="cotton_candy_natural">Cotton Candy — All Natural</option>
+          <option value="hybrid" data-i18n="fl_hybrid">Híbrido (combina 2 sabores — nota abajo)</option>
+        </select>
+        <h2 data-i18n="q_strength_h">Intensidad del sabor</h2>
+        <div class="options" data-name="strength">
+          <label><input type="radio" name="strength" value="regular" checked> <span data-i18n="opt_str_regular">Regular (recomendado)</span></label>
+          <label><input type="radio" name="strength" value="lite"> <span data-i18n="opt_str_lite">Lite — 50% menos sabor</span></label>
+          <label><input type="radio" name="strength" value="mega"> <span data-i18n="opt_str_mega">Mega — 50% más sabor</span></label>
+        </div>
+        <input type="text" id="notes" data-i18n-placeholder="q_notes_ph" placeholder="Notas opcionales (ej. sabores híbridos, alergias, preferencias extra)">
+        <button type="submit" class="cta-btn" data-i18n="btn_generate">Generar mi mix personalizado</button>
+      </div>
+
+      <div class="progress"><span id="progressFill"></span></div>
+      <div class="step-nav">
+        <button type="button" id="prevBtn" data-i18n="btn_prev">Atrás</button>
+        <button type="button" id="nextBtn" data-i18n="btn_next">Siguiente</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- RESULT / EDITOR -->
+<section id="result" class="result hidden">
+  <div class="result-inner">
+    <h1 id="resultTitle"></h1>
+    <p id="resultMotivation" class="motivation"></p>
+
+    <div class="ai-box">
+      <h3 data-i18n="ai_title">🤖 Por qué te recomendamos esto</h3>
+      <p id="aiExplanation"></p>
+      <p class="ai-disclaimer" data-i18n="ai_disclaimer">Esta recomendación se generó automáticamente según tus respuestas. Puedes ajustar cualquier valor abajo en tu editor de mezcla.</p>
+    </div>
+
+    <h2 data-i18n="editor_title">Tu editor de mezcla</h2>
+    <div class="editor-grid">
+
+      <div class="field">
+        <label data-i18n="f_carbs">Carbohidratos por porción</label>
+        <select id="edCarbs">
+          <option value="25">25g</option>
+          <option value="50">50g</option>
+          <option value="75">75g</option>
+          <option value="100">100g</option>
+          <option value="125">125g</option>
+          <option value="150">150g</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_sodium">Sodio por porción</label>
+        <select id="edSodium">
+          <option value="200" data-i18n="sod_light">Light (200mg)</option>
+          <option value="400" data-i18n="sod_lightmod">Light-Moderate (400mg)</option>
+          <option value="600" data-i18n="sod_mod">Moderate (600mg)</option>
+          <option value="800" data-i18n="sod_modhigh">Moderate-High (800mg)</option>
+          <option value="1000" data-i18n="sod_high">High (1000mg)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_ratio">Proporción Malto:Fructosa</label>
+        <select id="edRatio">
+          <option value="1:0.8" data-i18n="ratio_default">1:0.8 (Default)</option>
+          <option value="2:1">2:1</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_caffeine">Cafeína por porción</label>
+        <select id="edCaffeine">
+          <option value="0" data-i18n="caf_default">0mg (Default)</option>
+          <option value="25">25mg</option>
+          <option value="50">50mg</option>
+          <option value="75">75mg</option>
+          <option value="100">100mg</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_sweetener">Endulzante</label>
+        <select id="edSweetener">
+          <option value="standard" data-i18n="sw_standard">Estándar</option>
+          <option value="natural" data-i18n="sw_natural">Natural (tipo miel)</option>
+          <option value="low" data-i18n="sw_low">Bajo en azúcar</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_preservatives">Conservadores</label>
+        <select id="edPreservatives">
+          <option value="yes" data-i18n="pres_yes">Sí (recomendado)</option>
+          <option value="no" data-i18n="pres_no">Sin conservadores</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_flavor">Sabor</label>
+        <select id="edFlavor"></select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_strength">Intensidad de sabor</label>
+        <select id="edStrength">
+          <option value="regular" data-i18n="opt_str_regular">Regular (recomendado)</option>
+          <option value="lite" data-i18n="opt_str_lite">Lite — 50% menos sabor</option>
+          <option value="mega" data-i18n="opt_str_mega">Mega — 50% más sabor</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label data-i18n="f_scooper">¿Incluir cuchara dosificadora?</label>
+        <select id="edScooper">
+          <option value="yes" data-i18n="select_yes">Sí</option>
+          <option value="no" data-i18n="select_no">No</option>
+        </select>
+      </div>
+
+      <div class="field full">
+        <label data-i18n="f_notes">Notas para tu mezcla</label>
+        <textarea id="edNotes" rows="3"></textarea>
+      </div>
+    </div>
+
+    <button id="askAiBtn" class="ai-btn" data-i18n="btn_ask_ai">Pregúntale a la IA sobre tu mezcla</button>
+    <div id="aiChatBox" class="ai-chat hidden">
+      <div id="aiChatLog" class="ai-chat-log"></div>
+      <div class="ai-chat-input">
+        <input type="text" id="aiChatInput" data-i18n-placeholder="ai_chat_ph" placeholder="Escribe tu pregunta sobre tu mezcla…">
+        <button id="aiChatSend" data-i18n="btn_send">Enviar</button>
+      </div>
+    </div>
+
+    <div class="package-preview">
+      <h3 data-i18n="pkg_title">Vista previa de tu paquete</h3>
+      <div class="package-card">
+        <div class="package-name" id="pkgName"></div>
+        <div class="package-phrase" id="pkgPhrase"></div>
+        <div class="package-specs" id="pkgSpecs"></div>
+      </div>
+    </div>
+
+    <button id="restartBtn" class="cta-btn secondary" data-i18n="btn_restart">Volver a tomar la encuesta</button>
+  </div>
+</section>
+
+<footer class="footer">
+  <p data-i18n="footer_text">Combustible personalizado para atletas de alto rendimiento. No es un consejo médico — consulta a un profesional de nutrición deportiva para necesidades específicas.</p>
+</footer>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
