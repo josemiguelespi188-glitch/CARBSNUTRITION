@@ -1,0 +1,257 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useLocale } from "@/lib/i18n/context";
+import { SiteHeader } from "@/components/SiteHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardBody, CardTitle } from "@/components/ui/card";
+import { AssessmentAnswers, CustomMix, FormulaRecommendation } from "@/lib/types";
+import { buildPackRecommendation, editWarningCopy, getEditWarnings } from "@/lib/recommendation";
+
+const carbSteps = [25, 50, 75, 100, 125, 150] as const;
+const sodiumSteps = [200, 400, 600, 800, 1000] as const;
+const caffeineSteps = [0, 25, 50, 75, 100] as const;
+
+type ChatMsg = { role: "user" | "assistant"; text: string };
+
+export default function MixPage() {
+  const { t, locale } = useLocale();
+  const router = useRouter();
+
+  const [answers, setAnswers] = useState<AssessmentAnswers | null>(null);
+  const [mix, setMix] = useState<CustomMix | null>(null);
+  const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+
+  useEffect(() => {
+    const a = sessionStorage.getItem("carbyn:answers");
+    const m = sessionStorage.getItem("carbyn:mix");
+    if (!a || !m) {
+      router.replace("/assessment");
+      return;
+    }
+    setAnswers(JSON.parse(a));
+    setMix(JSON.parse(m));
+  }, [router]);
+
+  if (!answers || !mix) return null;
+
+  const pack = buildPackRecommendation(answers);
+  const warnings = getEditWarnings(mix, mix);
+
+  function update<K extends keyof FormulaRecommendation>(key: K, value: FormulaRecommendation[K]) {
+    setMix((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, [key]: value };
+      sessionStorage.setItem("carbyn:mix", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  async function sendChat() {
+    const question = chatInput.trim();
+    if (!question || !answers || !mix) return;
+    setChat((c) => [...c, { role: "user", text: question }]);
+    setChatInput("");
+    setChatBusy(true);
+    try {
+      const res = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, answers, formula: mix, locale }),
+      });
+      const data = await res.json();
+      setChat((c) => [...c, { role: "assistant", text: data.answer || (locale === "en" ? "Sorry, I couldn't process that." : "Lo siento, no pude procesar eso.") }]);
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
+  const isEn = locale === "en";
+
+  return (
+    <div className="flex min-h-screen flex-col bg-black">
+      <SiteHeader />
+      <main className="flex-1 px-6 pt-28 pb-24">
+        <div className="mx-auto max-w-3xl">
+          {/* Package preview */}
+          <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 to-black p-8 text-center">
+            <p className="text-xs uppercase tracking-[0.4em] text-neutral-500">{isEn ? "Your Personalized Formula" : "Tu Fórmula Personalizada"}</p>
+            <h1 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">{mix.packageLabel}</h1>
+            <p className="mt-3 italic text-neutral-400">{mix.motivationalMessage[locale]}</p>
+            {answers.eventName && (
+              <p className="mt-1 text-sm text-neutral-500">
+                {isEn ? `Built for your ${answers.eventName} preparation.` : `Hecho para tu preparación de ${answers.eventName}.`}
+              </p>
+            )}
+          </div>
+
+          {/* AI explanation panel */}
+          <section className="mt-10">
+            <Card className="border-neutral-700">
+              <CardTitle>{isEn ? "Why We Recommended This" : "Por Qué Te Recomendamos Esto"}</CardTitle>
+              <div className="mt-4 space-y-3">
+                {mix.reasoning.map((r) => (
+                  <p key={r.field} className="text-sm text-neutral-400 leading-relaxed">
+                    {r.explanation[locale]}
+                  </p>
+                ))}
+              </div>
+            </Card>
+          </section>
+
+          {/* Custom mix editor */}
+          <section className="mt-10">
+            <h2 className="text-xl font-semibold tracking-tight">{isEn ? "Your Mix Editor" : "Tu Editor de Mezcla"}</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              {isEn ? "Adjust any value — we'll let you know if you stray far from your recommendation." : "Ajusta cualquier valor — te avisaremos si te alejas mucho de tu recomendación."}
+            </p>
+
+            <div className="mt-6 grid gap-5 sm:grid-cols-2">
+              <EditorField label={isEn ? "Carbs per serving" : "Carbohidratos por porción"}>
+                <StepSelect value={mix.carbsPerServing} steps={carbSteps} suffix="g" onChange={(v) => update("carbsPerServing", v as FormulaRecommendation["carbsPerServing"])} />
+              </EditorField>
+              <EditorField label={isEn ? "Sodium per serving" : "Sodio por porción"}>
+                <StepSelect value={mix.sodiumPerServing} steps={sodiumSteps} suffix="mg" onChange={(v) => update("sodiumPerServing", v as FormulaRecommendation["sodiumPerServing"])} />
+              </EditorField>
+              <EditorField label={isEn ? "Caffeine per serving" : "Cafeína por porción"}>
+                <StepSelect value={mix.caffeinePerServing} steps={caffeineSteps} suffix="mg" onChange={(v) => update("caffeinePerServing", v as FormulaRecommendation["caffeinePerServing"])} />
+              </EditorField>
+              <EditorField label={isEn ? "Malto:Fructose ratio" : "Proporción Malto:Fructosa"}>
+                <div className="flex gap-2">
+                  {(["1:0.8", "2:1"] as const).map((r) => (
+                    <button key={r} onClick={() => update("ratio", r)}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.ratio === r ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </EditorField>
+              <EditorField label={isEn ? "Flavor strength" : "Intensidad del sabor"}>
+                <div className="flex gap-2">
+                  {(["lite", "regular", "mega"] as const).map((s) => (
+                    <button key={s} onClick={() => update("flavorStrength", s)}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${mix.flavorStrength === s ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </EditorField>
+              <EditorField label={isEn ? "Preservatives" : "Conservadores"}>
+                <div className="flex gap-2">
+                  {(["yes", "no"] as const).map((v) => (
+                    <button key={v} onClick={() => update("preservatives", v)}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.preservatives === v ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      {v === "yes" ? (isEn ? "Yes (recommended)" : "Sí (recomendado)") : (isEn ? "No preservatives" : "Sin conservadores")}
+                    </button>
+                  ))}
+                </div>
+              </EditorField>
+              <EditorField label={isEn ? "Include a scooper?" : "¿Incluir cuchara dosificadora?"}>
+                <div className="flex gap-2">
+                  {(["yes", "no"] as const).map((v) => (
+                    <button key={v} onClick={() => update("scooper", v)}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.scooper === v ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      {v === "yes" ? (isEn ? "Yes" : "Sí") : "No"}
+                    </button>
+                  ))}
+                </div>
+              </EditorField>
+            </div>
+
+            {warnings.length > 0 && (
+              <div className="mt-6 space-y-2">
+                {warnings.map((w) => (
+                  <div key={w} className="rounded-xl border border-neutral-600 bg-neutral-950 px-4 py-3 text-sm text-neutral-300">
+                    ⚠️ {editWarningCopy[w][locale]}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Pack recommendation */}
+          <section className="mt-10">
+            <Card>
+              <CardTitle>{isEn ? "Recommended Supply" : "Suministro Recomendado"}</CardTitle>
+              <CardBody>
+                <p className="text-base text-white font-medium">{pack.label[locale]}</p>
+                <p className="mt-2">{pack.reasoning[locale]}</p>
+                {pack.bundleRaceFormula && (
+                  <p className="mt-3 rounded-lg border border-neutral-700 px-4 py-3 text-neutral-300">
+                    {isEn
+                      ? "We also suggest pairing this with a separate Race Day Formula — tuned specifically for competition demands."
+                      : "También sugerimos combinarlo con una Fórmula de Día de Carrera independiente — ajustada específicamente para las exigencias de competencia."}
+                  </p>
+                )}
+              </CardBody>
+            </Card>
+          </section>
+
+          {/* AI chat */}
+          <section className="mt-10">
+            <Card>
+              <CardTitle>{isEn ? "Ask Our AI Advisor" : "Pregúntale a Nuestro Asesor de IA"}</CardTitle>
+              <p className="mt-1 text-sm text-neutral-500">
+                {isEn ? `e.g. "Why did you give me ${mix.sodiumPerServing}mg of sodium?"` : `Ej. "¿Por qué me diste ${mix.sodiumPerServing}mg de sodio?"`}
+              </p>
+              <div className="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
+                {chat.map((m, i) => (
+                  <div key={i} className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "ml-8 bg-white text-black" : "mr-8 bg-neutral-900 text-neutral-300"}`}>
+                    {m.text}
+                  </div>
+                ))}
+                {chatBusy && <div className="mr-8 rounded-xl bg-neutral-900 px-4 py-2.5 text-sm text-neutral-500">{isEn ? "Thinking…" : "Pensando…"}</div>}
+              </div>
+              <div className="mt-4 flex gap-2">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendChat()}
+                  placeholder={isEn ? "Type your question…" : "Escribe tu pregunta…"}
+                  className="flex-1 rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-white focus:outline-none"
+                />
+                <Button size="sm" onClick={sendChat} disabled={chatBusy || !chatInput.trim()}>{isEn ? "Send" : "Enviar"}</Button>
+              </div>
+            </Card>
+          </section>
+
+          <div className="mt-12 flex flex-col items-center gap-3 text-center">
+            <Button size="lg">{isEn ? "Order This Formula" : "Ordenar Esta Fórmula"}</Button>
+            <Link href="/assessment" className="text-xs text-neutral-500 underline underline-offset-4 hover:text-neutral-300">
+              {isEn ? "Retake the assessment" : "Repetir la evaluación"}
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function EditorField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs uppercase tracking-widest text-neutral-500">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function StepSelect<T extends number>({ value, steps, suffix, onChange }: { value: T; steps: readonly T[]; suffix: string; onChange: (v: T) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {steps.map((s) => (
+        <button
+          key={s}
+          onClick={() => onChange(s)}
+          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${value === s ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}
+        >
+          {s}{suffix}
+        </button>
+      ))}
+    </div>
+  );
+}
