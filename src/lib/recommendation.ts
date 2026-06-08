@@ -11,7 +11,7 @@ import {
  *
  * Deterministic rules engine that converts an athlete's assessment answers
  * into a starting formula. This is the "v1 brain" — structured so that the
- * same inputs/outputs can later be routed through an OpenAI model that
+ * same inputs/outputs can later be routed through a Claude model that
  * reasons over the same signals (see lib/ai.ts).
  */
 

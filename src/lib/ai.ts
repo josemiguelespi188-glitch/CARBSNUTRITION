@@ -1,12 +1,12 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { AssessmentAnswers, FormulaRecommendation } from "./types";
 
-let client: OpenAI | null = null;
+let cachedClient: Anthropic | null = null;
 
-function getClient(): OpenAI | null {
-  if (!process.env.OPENAI_API_KEY) return null;
-  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return client;
+function getClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!cachedClient) cachedClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return cachedClient;
 }
 
 const SYSTEM_PROMPT = `You are CARBYN's sports nutrition AI advisor. You explain personalized
@@ -24,13 +24,13 @@ export interface AiChatContext {
 
 /**
  * Answers a free-form athlete question about their formula.
- * Falls back to a deterministic, rules-based explanation when no OPENAI_API_KEY
+ * Falls back to a deterministic, rules-based explanation when no ANTHROPIC_API_KEY
  * is configured (e.g. local development), so the product still works end-to-end.
  */
 export async function answerFormulaQuestion(question: string, ctx: AiChatContext): Promise<string> {
-  const openai = getClient();
+  const client = getClient();
 
-  if (!openai) {
+  if (!client) {
     return fallbackAnswer(question, ctx);
   }
 
@@ -50,17 +50,15 @@ Current formula:
 `.trim();
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "system", content: contextSummary },
-        { role: "user", content: question },
-      ],
-      temperature: 0.5,
+    const message = await client!.messages.create({
+      model: "claude-sonnet-4-6",
       max_tokens: 350,
+      temperature: 0.5,
+      system: `${SYSTEM_PROMPT}\n\n${contextSummary}`,
+      messages: [{ role: "user", content: question }],
     });
-    return completion.choices[0]?.message?.content?.trim() || fallbackAnswer(question, ctx);
+    const text = message.content.find((b) => b.type === "text");
+    return (text && "text" in text ? text.text.trim() : "") || fallbackAnswer(question, ctx);
   } catch {
     return fallbackAnswer(question, ctx);
   }
