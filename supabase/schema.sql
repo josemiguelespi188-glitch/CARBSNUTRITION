@@ -167,7 +167,7 @@ create table if not exists public.flavors (
   key text unique not null,             -- e.g. 'blue_raspberry'
   label_en text not null,
   label_es text not null,
-  natural boolean default false,
+  is_natural boolean default false,
   active boolean default true,
   sort_order integer default 0
 );
@@ -285,7 +285,7 @@ create policy "Admins manage flavors" on public.flavors
 -- =====================================================================
 -- SEED: Flavor catalog (matches the assessment & mix editor options)
 -- =====================================================================
-insert into public.flavors (key, label_en, label_es, natural, sort_order) values
+insert into public.flavors (key, label_en, label_es, is_natural, sort_order) values
   ('unflavored', 'Unflavored', 'Sin sabor', false, 1),
   ('blue_raspberry', 'Blue Raspberry', 'Blue Raspberry', false, 2),
   ('lemon_lime', 'Lemon Lime', 'Lemon Lime', false, 3),
