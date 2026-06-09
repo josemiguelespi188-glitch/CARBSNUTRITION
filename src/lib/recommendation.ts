@@ -1,9 +1,12 @@
 import {
   AssessmentAnswers,
   CustomMix,
+  DualMix,
   FormulaRecommendation,
   PackRecommendation,
+  RaceDayFuelingPlan,
   ReasoningEntry,
+  ScoopWeek,
 } from "./types";
 
 /**
@@ -260,5 +263,84 @@ export function assembleCustomMix(a: AssessmentAnswers): CustomMix {
     packageLabel: `${firstName}'s Custom Fuel`,
     motivationalMessage: buildMotivationalMessage(firstName, a.eventName),
     warnings: [],
+  };
+}
+
+/** Builds separate training + race formulas from a single assessment. */
+export function buildDualMix(a: AssessmentAnswers): DualMix {
+  const base = buildRecommendation(a);
+  const trainingMix: FormulaRecommendation = {
+    ...base,
+    caffeinePerServing: clampCaffeine(base.caffeinePerServing - 25),
+  };
+  const longEvents: AssessmentAnswers["sportType"][] = ["ironman", "ultra", "trail"];
+  const raceMix: FormulaRecommendation = {
+    ...base,
+    caffeinePerServing: base.caffeinePerServing,
+    carbsPerServing: longEvents.includes(a.sportType)
+      ? clampCarbs(base.carbsPerServing + 25)
+      : base.carbsPerServing,
+  };
+  return {
+    training: trainingMix,
+    race: raceMix,
+    reasoning: {
+      en: `Your training mix uses ${trainingMix.caffeinePerServing}mg caffeine — enough to support performance without building tolerance before race day. Your race mix uses ${raceMix.caffeinePerServing}mg caffeine and ${raceMix.carbsPerServing}g carbs, optimized for peak performance when it counts.`,
+      es: `Tu mezcla de entrenamiento usa ${trainingMix.caffeinePerServing}mg de cafeína — suficiente para el rendimiento sin generar tolerancia antes de la carrera. Tu mezcla de carrera usa ${raceMix.caffeinePerServing}mg de cafeína y ${raceMix.carbsPerServing}g de carbos, optimizados para el máximo rendimiento cuando más importa.`,
+    },
+  };
+}
+
+/** Week-by-week scoop plan periodized toward the event date. */
+export function buildScoopPlan(a: AssessmentAnswers): ScoopWeek[] {
+  const weeksToEvent = a.eventDate
+    ? Math.max(1, Math.round((new Date(a.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)))
+    : 12;
+  const sessionsPerWeek = Math.max(1, Math.round(a.trainingHoursPerWeek / 1.5));
+  const weeks: ScoopWeek[] = [];
+  for (let w = 1; w <= Math.min(weeksToEvent, 16); w++) {
+    const phase = w / weeksToEvent;
+    const multiplier = phase < 0.3 ? 0.7 : phase < 0.7 ? 1.0 : phase < 0.9 ? 1.2 : 0.6;
+    const scoops = Math.round(sessionsPerWeek * multiplier * 2);
+    weeks.push({ week: w, scoops, label: `Week ${w}` });
+  }
+  return weeks;
+}
+
+/** Race-day fueling plan tailored to sport type and the chosen formula. */
+export function buildRaceDayPlan(a: AssessmentAnswers, formula: FormulaRecommendation): RaceDayFuelingPlan {
+  const isLong = ["ironman", "ultra", "trail"].includes(a.sportType);
+  const isTri = ["ironman", "triathlon"].includes(a.sportType);
+  return {
+    preRace: {
+      carbs: 50,
+      description: {
+        en: "30-60 min before start: prime your glycogen stores without overloading your stomach.",
+        es: "30-60 min antes de la salida: activa tus reservas de glucógeno sin sobrecargar el estómago.",
+      },
+    },
+    bike: isTri
+      ? {
+          carbsPerHour: formula.carbsPerServing * 2,
+          description: {
+            en: `Target ${formula.carbsPerServing * 2}g carbs/hour on the bike — this is your primary fueling window.`,
+            es: `Objetivo de ${formula.carbsPerServing * 2}g de carbos/hora en bici — esta es tu ventana principal de alimentación.`,
+          },
+        }
+      : undefined,
+    run: {
+      carbsPerHour: isLong ? Math.round(formula.carbsPerServing * 1.5) : formula.carbsPerServing,
+      description: {
+        en: `${isLong ? "Gut stress increases on the run — take smaller, more frequent sips." : "Maintain steady fueling throughout your run."}`,
+        es: `${isLong ? "El estrés digestivo aumenta en la carrera — toma sorbos más pequeños y frecuentes." : "Mantén una alimentación constante durante tu carrera."}`,
+      },
+    },
+    recovery: {
+      carbs: 50,
+      description: {
+        en: "Within 30 min of finish: kick off glycogen resynthesis.",
+        es: "En los primeros 30 min post-llegada: activa la resíntesis de glucógeno.",
+      },
+    },
   };
 }

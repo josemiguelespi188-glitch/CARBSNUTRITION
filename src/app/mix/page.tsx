@@ -8,7 +8,23 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardTitle } from "@/components/ui/card";
 import { AssessmentAnswers, CustomMix, FormulaRecommendation } from "@/lib/types";
-import { buildPackRecommendation, editWarningCopy, getEditWarnings } from "@/lib/recommendation";
+import {
+  buildPackRecommendation,
+  buildDualMix,
+  buildScoopPlan,
+  buildRaceDayPlan,
+  editWarningCopy,
+  getEditWarnings,
+} from "@/lib/recommendation";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 const carbSteps = [25, 50, 75, 100, 125, 150] as const;
 const sodiumSteps = [200, 400, 600, 800, 1000] as const;
@@ -41,6 +57,14 @@ export default function MixPage() {
 
   const pack = buildPackRecommendation(answers);
   const warnings = getEditWarnings(mix, mix);
+  const scoopPlan = buildScoopPlan(answers);
+  const totalScoops = scoopPlan.reduce((sum, w) => sum + w.scoops, 0);
+  const weeksToEvent = answers.eventDate
+    ? Math.max(0, Math.round((new Date(answers.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)))
+    : null;
+  const raceDay = buildRaceDayPlan(answers, mix);
+  const showDual = answers.caffeineGoal === "both" || answers.goal === "both";
+  const dual = showDual ? buildDualMix(answers) : null;
 
   function update<K extends keyof FormulaRecommendation>(key: K, value: FormulaRecommendation[K]) {
     setMix((prev) => {
@@ -77,6 +101,29 @@ export default function MixPage() {
       <SiteHeader />
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-3xl">
+          {/* Premium product mockup */}
+          <div className="mb-8 overflow-hidden rounded-3xl border border-neutral-800 bg-black">
+            <div className="bg-gradient-to-b from-neutral-900 to-black px-8 py-12 text-center">
+              <p className="text-[10px] uppercase tracking-[0.5em] text-neutral-600">CARBYN</p>
+              <h2 className="mt-4 text-3xl sm:text-5xl font-black uppercase tracking-tight text-white">
+                {(answers.name.split(" ")[0] || answers.name).toUpperCase()}&apos;S CUSTOM FUEL
+              </h2>
+              {answers.eventName && (
+                <p className="mt-3 text-sm uppercase tracking-[0.25em] text-neutral-400">
+                  {isEn ? `Built for ${answers.eventName}` : `Hecho para ${answers.eventName}`}
+                </p>
+              )}
+              <p className="mt-4 italic text-neutral-400">{mix.motivationalMessage[locale]}</p>
+              <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-neutral-700 px-5 py-2 text-xs text-neutral-300">
+                <span>{mix.carbsPerServing}g {isEn ? "carbs" : "carbos"}</span>
+                <span className="text-neutral-600">|</span>
+                <span>{mix.sodiumPerServing}mg {isEn ? "sodium" : "sodio"}</span>
+                <span className="text-neutral-600">|</span>
+                <span>{mix.caffeinePerServing}mg {isEn ? "caffeine" : "cafeína"}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Package preview */}
           <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 to-black p-8 text-center">
             <p className="text-xs uppercase tracking-[0.4em] text-neutral-500">{isEn ? "Your Personalized Formula" : "Tu Fórmula Personalizada"}</p>
@@ -191,6 +238,89 @@ export default function MixPage() {
             </Card>
           </section>
 
+          {/* Scoop planning */}
+          <section className="mt-10">
+            <Card>
+              <CardTitle>{isEn ? "Scoop Plan" : "Plan de Cucharadas"}</CardTitle>
+              <div className="mt-2 flex flex-wrap gap-6 text-sm text-neutral-300">
+                <span>{isEn ? "Total scoops:" : "Cucharadas totales:"} <span className="font-semibold text-white">{totalScoops}</span></span>
+                {weeksToEvent !== null && (
+                  <span>{isEn ? "Weeks until event:" : "Semanas hasta el evento:"} <span className="font-semibold text-white">{weeksToEvent}</span></span>
+                )}
+              </div>
+              <div className="mt-6 h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={scoopPlan} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
+                    <CartesianGrid stroke="#262626" vertical={false} />
+                    <XAxis dataKey="week" stroke="#737373" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#737373" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "#171717" }}
+                      contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", borderRadius: 8, color: "#fff" }}
+                      labelFormatter={(w) => (isEn ? `Week ${w}` : `Semana ${w}`)}
+                    />
+                    <Bar dataKey="scoops" fill="#ffffff" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </section>
+
+          {/* Race day fueling plan */}
+          <section className="mt-10">
+            <Card>
+              <CardTitle>{isEn ? "Race Day Fueling Plan" : "Plan de Alimentación del Día de Carrera"}</CardTitle>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <PhaseCard
+                  title={isEn ? "Pre-Race" : "Pre-Carrera"}
+                  metric={`${raceDay.preRace.carbs}g`}
+                  desc={raceDay.preRace.description[locale]}
+                />
+                {raceDay.bike && (
+                  <PhaseCard
+                    title={isEn ? "Bike" : "Bici"}
+                    metric={`${raceDay.bike.carbsPerHour}g/h`}
+                    desc={raceDay.bike.description[locale]}
+                  />
+                )}
+                {raceDay.run && (
+                  <PhaseCard
+                    title={isEn ? "Run" : "Carrera"}
+                    metric={`${raceDay.run.carbsPerHour}g/h`}
+                    desc={raceDay.run.description[locale]}
+                  />
+                )}
+                <PhaseCard
+                  title={isEn ? "Recovery" : "Recuperación"}
+                  metric={`${raceDay.recovery.carbs}g`}
+                  desc={raceDay.recovery.description[locale]}
+                />
+              </div>
+            </Card>
+          </section>
+
+          {/* Dual mix view */}
+          {dual && (
+            <section className="mt-10">
+              <Card>
+                <CardTitle>{isEn ? "Training Mix vs Race Mix" : "Mezcla de Entrenamiento vs Carrera"}</CardTitle>
+                <p className="mt-2 text-sm text-neutral-400 leading-relaxed">{dual.reasoning[locale]}</p>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <MixSummary
+                    title={isEn ? "Training Mix" : "Mezcla de Entrenamiento"}
+                    formula={dual.training}
+                    isEn={isEn}
+                  />
+                  <MixSummary
+                    title={isEn ? "Race Mix" : "Mezcla de Carrera"}
+                    formula={dual.race}
+                    isEn={isEn}
+                  />
+                </div>
+              </Card>
+            </section>
+          )}
+
           {/* AI chat */}
           <section className="mt-10">
             <Card>
@@ -227,6 +357,40 @@ export default function MixPage() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function PhaseCard({ title, metric, desc }: { title: string; metric: string; desc: string }) {
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+      <div className="flex items-baseline justify-between">
+        <p className="text-xs uppercase tracking-widest text-neutral-500">{title}</p>
+        <p className="text-lg font-semibold text-white">{metric}</p>
+      </div>
+      <p className="mt-3 text-sm text-neutral-400 leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function MixSummary({ title, formula, isEn }: { title: string; formula: FormulaRecommendation; isEn: boolean }) {
+  const rows: [string, string][] = [
+    [isEn ? "Carbs" : "Carbos", `${formula.carbsPerServing}g`],
+    [isEn ? "Sodium" : "Sodio", `${formula.sodiumPerServing}mg`],
+    [isEn ? "Caffeine" : "Cafeína", `${formula.caffeinePerServing}mg`],
+    [isEn ? "Flavor" : "Sabor", formula.flavor.replace(/_/g, " ")],
+  ];
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+      <p className="text-sm font-semibold uppercase tracking-widest text-white">{title}</p>
+      <dl className="mt-4 space-y-2">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between text-sm">
+            <dt className="text-neutral-500">{k}</dt>
+            <dd className="capitalize text-neutral-200">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

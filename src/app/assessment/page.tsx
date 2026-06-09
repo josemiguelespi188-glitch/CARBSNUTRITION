@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
-import { AssessmentAnswers, SportType, Goal, Tolerance, YesNo } from "@/lib/types";
+import { AssessmentAnswers } from "@/lib/types";
 import { assembleCustomMix } from "@/lib/recommendation";
 import { createClient } from "@/lib/supabase/client";
+import { PhoneInput } from "@/components/PhoneInput";
+
+const todayISO = () => new Date().toISOString().split("T")[0];
 
 const FLAVORS = [
   "unflavored", "blue_raspberry", "lemon_lime", "cherry", "pineapple", "kiwi",
@@ -16,21 +19,23 @@ const FLAVORS = [
 ];
 
 const initialAnswers: AssessmentAnswers = {
-  name: "", email: "", phone: "",
+  name: "", email: "", phone: "+1 ",
   sportType: "marathon", goal: "race", trainingHoursPerWeek: 6,
   eventName: "", eventDate: "",
   caffeineTolerance: "medium", caffeineConsumption: "occasional",
   sweatRate: "medium", hotClimateTraining: "no", sodiumIssues: "no",
   digestiveIssues: "no", fructoseTolerance: "normal", sugarSensitivity: "no",
   diabetes: "no", preferredSweetness: "regular",
-  flavorPreferences: [], currentNutritionStrategy: "", carbTargetPerHour: 60,
+  flavorPreferences: [], currentNutritionStrategy: "",
+  nutritionStrategyItems: [], nutritionStrategyNotes: "",
+  caffeineGoal: "both", carbTargetPerHour: 60,
   pastIssuesWithGels: "no", pastIssuesWithSportsDrinks: "no",
 };
 
 type Field<K extends keyof AssessmentAnswers> = {
   key: K;
   label: { en: string; es: string };
-  type: "text" | "email" | "tel" | "number" | "date" | "single" | "multi";
+  type: "text" | "email" | "phone" | "number" | "date" | "single" | "multi" | "multi-notes";
   options?: { value: string; label: { en: string; es: string } }[];
   showIf?: (a: AssessmentAnswers) => boolean;
 };
@@ -59,44 +64,50 @@ const yesNo = [
   { value: "yes", label: { en: "Yes", es: "Sí" } },
   { value: "no", label: { en: "No", es: "No" } },
 ];
+const caffeineGoalOptions = [
+  { value: "training_only", label: { en: "Training Mix Only", es: "Solo Mezcla de Entrenamiento" } },
+  { value: "race_only", label: { en: "Race Mix Only", es: "Solo Mezcla de Carrera" } },
+  { value: "both", label: { en: "Both (Training + Race)", es: "Ambas (Entrenamiento + Carrera)" } },
+];
+const nutritionStrategyOptions = [
+  { value: "water_only", label: { en: "Water only", es: "Solo agua" } },
+  { value: "sports_drink", label: { en: "Sports drink", es: "Bebida deportiva" } },
+  { value: "energy_gels", label: { en: "Energy gels", es: "Geles energéticos" } },
+  { value: "energy_chews", label: { en: "Energy chews", es: "Gomitas energéticas" } },
+  { value: "homemade", label: { en: "Homemade fuel", es: "Fuel casero" } },
+  { value: "carb_drink_mix", label: { en: "Carb drink mix", es: "Mezcla de carbohidratos" } },
+  { value: "no_fuel", label: { en: "No fuel", es: "Sin fuel" } },
+  { value: "other", label: { en: "Other", es: "Otro" } },
+];
 
 // The flow is dynamic: each field decides whether to show based on prior answers.
 const fields: Field<keyof AssessmentAnswers>[] = [
   { key: "name", label: { en: "What's your name?", es: "¿Cuál es tu nombre?" }, type: "text" },
   { key: "email", label: { en: "Your email", es: "Tu correo electrónico" }, type: "email" },
-  { key: "phone", label: { en: "Your phone number", es: "Tu número de teléfono" }, type: "tel" },
+  { key: "phone", label: { en: "Your phone number", es: "Tu número de teléfono" }, type: "phone" },
 
   { key: "sportType", label: { en: "What's your sport?", es: "¿Cuál es tu deporte?" }, type: "single", options: sportOptions },
+  { key: "eventName", label: { en: "What event are you training for?", es: "¿Para qué evento te estás preparando?" }, type: "text" },
+  { key: "eventDate", label: { en: "When is your event?", es: "¿Cuándo es tu evento?" }, type: "date" },
   { key: "goal", label: { en: "Is this for a race, training, or both?", es: "¿Es para una carrera, entrenamiento o ambos?" }, type: "single", options: goalOptions },
-  {
-    key: "eventName",
-    label: { en: "What event are you training for?", es: "¿Para qué evento te estás preparando?" },
-    type: "text",
-    showIf: (a) => a.goal === "race" || a.goal === "both",
-  },
-  {
-    key: "eventDate",
-    label: { en: "When is your event?", es: "¿Cuándo es tu evento?" },
-    type: "date",
-    showIf: (a) => a.goal === "race" || a.goal === "both",
-  },
+
   { key: "trainingHoursPerWeek", label: { en: "How many hours do you train per week?", es: "¿Cuántas horas entrenas por semana?" }, type: "number" },
   { key: "carbTargetPerHour", label: { en: "How many carbs (grams) do you currently aim for per hour of effort?", es: "¿Cuántos carbohidratos (gramos) buscas consumir por hora de esfuerzo actualmente?" }, type: "number" },
-  { key: "currentNutritionStrategy", label: { en: "Briefly describe your current fueling strategy", es: "Describe brevemente tu estrategia de alimentación actual" }, type: "text" },
-
-  { key: "caffeineTolerance", label: { en: "How would you describe your caffeine tolerance?", es: "¿Cómo describirías tu tolerancia a la cafeína?" }, type: "single", options: toleranceOptions },
   {
-    key: "caffeineConsumption",
-    label: { en: "How much caffeine do you consume daily?", es: "¿Cuánta cafeína consumes diariamente?" },
-    type: "single",
-    options: [
-      { value: "none", label: { en: "None", es: "Nada" } },
-      { value: "occasional", label: { en: "Occasional (1 cup or less)", es: "Ocasional (1 taza o menos)" } },
-      { value: "daily", label: { en: "Daily (2-3 cups)", es: "Diario (2-3 tazas)" } },
-      { value: "heavy", label: { en: "Heavy (4+ cups)", es: "Alto (4+ tazas)" } },
-    ],
-    showIf: (a) => a.caffeineTolerance !== "none",
+    key: "nutritionStrategyItems",
+    label: { en: "What does your current fueling strategy include? (select all)", es: "¿Qué incluye tu estrategia de alimentación actual? (selecciona todo)" },
+    type: "multi-notes",
+    options: nutritionStrategyOptions,
   },
+
+  { key: "caffeineConsumption", label: { en: "How much caffeine do you consume daily?", es: "¿Cuánta cafeína consumes diariamente?" }, type: "single", options: [
+    { value: "none", label: { en: "None", es: "Nada" } },
+    { value: "occasional", label: { en: "Occasional (1 cup or less)", es: "Ocasional (1 taza o menos)" } },
+    { value: "daily", label: { en: "Daily (2-3 cups)", es: "Diario (2-3 tazas)" } },
+    { value: "heavy", label: { en: "Heavy (4+ cups)", es: "Alto (4+ tazas)" } },
+  ] },
+  { key: "caffeineTolerance", label: { en: "How would you describe your caffeine tolerance?", es: "¿Cómo describirías tu tolerancia a la cafeína?" }, type: "single", options: toleranceOptions },
+  { key: "caffeineGoal", label: { en: "For which purpose do you want caffeine?", es: "¿Para qué propósito quieres cafeína?" }, type: "single", options: caffeineGoalOptions },
 
   {
     key: "sweatRate",
@@ -179,10 +190,10 @@ export default function AssessmentPage() {
   function isValid(): boolean {
     if (!current) return true;
     const value = answers[current.key];
-    if (current.type === "multi") return Array.isArray(value);
+    if (current.type === "multi" || current.type === "multi-notes") return Array.isArray(value);
     if (current.type === "number") return typeof value === "number" && !Number.isNaN(value);
-    if (current.key === "eventName" || current.key === "eventDate" || current.key === "currentNutritionStrategy") {
-      return true; // optional free text
+    if (current.key === "eventName" || current.key === "eventDate") {
+      return true; // optional
     }
     return value !== "" && value !== undefined && value !== null;
   }
@@ -203,7 +214,6 @@ export default function AssessmentPage() {
     setSubmitting(true);
     const mix = assembleCustomMix(answers);
 
-    // Persist to Supabase if configured; never block the user flow on this.
     try {
       const supabase = createClient();
       const { data: assessment } = await supabase
@@ -248,12 +258,12 @@ export default function AssessmentPage() {
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{current.label[locale]}</h1>
 
           <div className="mt-8">
-            <FieldInput field={current} value={answers[current.key]} onChange={(v) => update(current.key, v as never)} locale={locale} />
+            <FieldInput field={current} answers={answers} onChange={(v) => update(current.key, v as never)} onUpdate={update} locale={locale} />
           </div>
 
           <div className="mt-10 flex items-center justify-between">
             <Button variant="ghost" onClick={handleBack} disabled={step === 0}>
-              {t.nav.assessment === "Start Assessment" ? "Back" : "Atrás"}
+              {locale === "en" ? "Back" : "Atrás"}
             </Button>
             <Button onClick={handleNext} disabled={!isValid() || submitting}>
               {step === visibleFields.length - 1
@@ -268,16 +278,34 @@ export default function AssessmentPage() {
 }
 
 function FieldInput({
-  field, value, onChange, locale,
+  field, answers, onChange, onUpdate, locale,
 }: {
   field: Field<keyof AssessmentAnswers>;
-  value: unknown;
+  answers: AssessmentAnswers;
   onChange: (v: unknown) => void;
+  onUpdate: <K extends keyof AssessmentAnswers>(key: K, value: AssessmentAnswers[K]) => void;
   locale: "en" | "es";
 }) {
+  const value = answers[field.key];
   const inputClasses = "w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 text-base text-white placeholder:text-neutral-600 focus:border-white focus:outline-none transition-colors";
 
-  if (field.type === "text" || field.type === "email" || field.type === "tel" || field.type === "date") {
+  if (field.type === "phone") {
+    return <PhoneInput value={(value as string) ?? ""} onChange={(v) => onChange(v)} locale={locale} />;
+  }
+
+  if (field.type === "date") {
+    return (
+      <input
+        type="date"
+        min={todayISO()}
+        className={inputClasses}
+        value={(value as string) ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  if (field.type === "text" || field.type === "email") {
     return (
       <input
         type={field.type}
@@ -321,28 +349,41 @@ function FieldInput({
     );
   }
 
-  if (field.type === "multi") {
+  if (field.type === "multi" || field.type === "multi-notes") {
     const selected = (value as string[]) ?? [];
+    const isStrategy = field.type === "multi-notes";
+    const maxLimit = isStrategy ? Infinity : 3;
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {field.options?.map((opt) => {
-          const active = selected.includes(opt.value);
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => {
-                if (active) onChange(selected.filter((v) => v !== opt.value));
-                else if (selected.length < 3) onChange([...selected, opt.value]);
-              }}
-              className={`rounded-xl border px-3 py-2.5 text-left text-xs capitalize transition-colors ${
-                active ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"
-              }`}
-            >
-              {opt.label[locale]}
-            </button>
-          );
-        })}
+      <div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {field.options?.map((opt) => {
+            const active = selected.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  if (active) onChange(selected.filter((v) => v !== opt.value));
+                  else if (selected.length < maxLimit) onChange([...selected, opt.value]);
+                }}
+                className={`rounded-xl border px-3 py-2.5 text-left text-xs capitalize transition-colors ${
+                  active ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"
+                }`}
+              >
+                {opt.label[locale]}
+              </button>
+            );
+          })}
+        </div>
+        {isStrategy && (
+          <input
+            type="text"
+            className={`${inputClasses} mt-4`}
+            value={answers.nutritionStrategyNotes}
+            onChange={(e) => onUpdate("nutritionStrategyNotes", e.target.value)}
+            placeholder={locale === "en" ? "Any extra notes (optional)…" : "Notas adicionales (opcional)…"}
+          />
+        )}
       </div>
     );
   }

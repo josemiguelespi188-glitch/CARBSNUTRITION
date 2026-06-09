@@ -43,6 +43,9 @@ export interface AssessmentAnswers {
   // Preferences
   flavorPreferences: string[];
   currentNutritionStrategy: string;
+  nutritionStrategyItems: string[];
+  nutritionStrategyNotes: string;
+  caffeineGoal: CaffeineGoal;
   carbTargetPerHour: number; // g/hour the athlete believes they need
   pastIssuesWithGels: YesNo;
   pastIssuesWithSportsDrinks: YesNo;
@@ -81,4 +84,25 @@ export interface CustomMix extends FormulaRecommendation {
   packageLabel: string;
   motivationalMessage: { en: string; es: string };
   warnings: ReasoningEntry["field"][];
+}
+
+export type CaffeineGoal = "training_only" | "race_only" | "both";
+
+export interface DualMix {
+  training: FormulaRecommendation;
+  race: FormulaRecommendation;
+  reasoning: { en: string; es: string };
+}
+
+export interface ScoopWeek {
+  week: number;
+  scoops: number;
+  label: string;
+}
+
+export interface RaceDayFuelingPlan {
+  preRace: { carbs: number; description: { en: string; es: string } };
+  bike?: { carbsPerHour: number; description: { en: string; es: string } };
+  run?: { carbsPerHour: number; description: { en: string; es: string } };
+  recovery: { carbs: number; description: { en: string; es: string } };
 }

@@ -1,12 +1,35 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/context";
+import { createClient } from "@/lib/supabase/client";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { Button } from "./ui/button";
 
 export function SiteHeader() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const router = useRouter();
+  const isEn = locale === "en";
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSignedIn(!!session?.user);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  async function signOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setSignedIn(false);
+    router.push("/");
+  }
+
   return (
     <header className="fixed top-0 inset-x-0 z-50 border-b border-neutral-900 bg-black/70 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -14,8 +37,22 @@ export function SiteHeader() {
           {t.brand.name}
         </Link>
         <nav className="hidden items-center gap-6 sm:flex">
-          <Link href="/dashboard" className="text-sm text-neutral-400 hover:text-white transition-colors">
-            {t.nav.dashboard}
+          {signedIn ? (
+            <>
+              <Link href="/dashboard" className="text-sm text-neutral-400 hover:text-white transition-colors">
+                {t.nav.dashboard}
+              </Link>
+              <button onClick={signOut} className="text-sm text-neutral-400 hover:text-white transition-colors">
+                {isEn ? "Sign Out" : "Cerrar Sesión"}
+              </button>
+            </>
+          ) : (
+            <Link href="/auth" className="text-sm text-neutral-400 hover:text-white transition-colors">
+              {isEn ? "Sign In" : "Iniciar Sesión"}
+            </Link>
+          )}
+          <Link href="/admin" className="text-sm text-neutral-500 hover:text-white transition-colors">
+            {isEn ? "Admin" : "Admin"}
           </Link>
           <LanguageSwitch />
           <Link href="/assessment">
