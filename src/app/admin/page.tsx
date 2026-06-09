@@ -44,6 +44,39 @@ const signupTrend = [
   { month: "Jun", count: 50 },
 ];
 
+const DEMO_ASSESSMENTS: AssessmentRow[] = [
+  { id: "1", name: "Carlos Méndez", email: "carlos@example.com", created_at: "2026-05-01T10:00:00Z", answers: { sportType: "ironman", eventName: "IRONMAN 70.3 Ecuador" } },
+  { id: "2", name: "Sofia Ruiz", email: "sofia@example.com", created_at: "2026-05-03T11:00:00Z", answers: { sportType: "marathon", eventName: "Maratón de Bogotá" } },
+  { id: "3", name: "Andrés Torres", email: "andres@example.com", created_at: "2026-05-05T09:30:00Z", answers: { sportType: "cycling", eventName: "La Vuelta Colombia" } },
+  { id: "4", name: "Valentina Cruz", email: "vale@example.com", created_at: "2026-05-07T14:00:00Z", answers: { sportType: "triathlon", eventName: "Triatlón Cali" } },
+  { id: "5", name: "Marco Jiménez", email: "marco@example.com", created_at: "2026-05-09T08:00:00Z", answers: { sportType: "ultra", eventName: "Ultra Sierra Nevada" } },
+  { id: "6", name: "Daniela Mora", email: "daniela@example.com", created_at: "2026-05-11T16:00:00Z", answers: { sportType: "trail", eventName: "Trail de los Andes" } },
+  { id: "7", name: "Pablo Herrera", email: "pablo@example.com", created_at: "2026-05-13T10:30:00Z", answers: { sportType: "marathon", eventName: "NYC Marathon" } },
+  { id: "8", name: "Isabella Vega", email: "isa@example.com", created_at: "2026-05-15T12:00:00Z", answers: { sportType: "ironman", eventName: "IRONMAN Mexico" } },
+  { id: "9", name: "Ricardo Salazar", email: "ricky@example.com", created_at: "2026-05-17T09:00:00Z", answers: { sportType: "cycling", eventName: "Gran Fondo Quito" } },
+  { id: "10", name: "Camila Ortiz", email: "camila@example.com", created_at: "2026-05-19T15:00:00Z", answers: { sportType: "triathlon", eventName: "Triatlón Lima" } },
+  { id: "11", name: "Juan Pérez", email: "juan@example.com", created_at: "2026-05-21T11:00:00Z", answers: { sportType: "marathon", eventName: "Maratón de Santiago" } },
+  { id: "12", name: "Lucía Fernández", email: "lucia@example.com", created_at: "2026-05-23T13:00:00Z", answers: { sportType: "trail", eventName: "Trail Patagonia" } },
+  { id: "13", name: "Diego Castillo", email: "diego@example.com", created_at: "2026-05-25T10:00:00Z", answers: { sportType: "ultra", eventName: "100K Montaña" } },
+  { id: "14", name: "Ana Vargas", email: "ana@example.com", created_at: "2026-05-27T14:30:00Z", answers: { sportType: "ironman", eventName: "IRONMAN 70.3 Cartagena" } },
+  { id: "15", name: "Felipe Rojas", email: "felipe@example.com", created_at: "2026-05-29T09:00:00Z", answers: { sportType: "cycling", eventName: "Tour del Valle" } },
+];
+
+const DEMO_FLAVORS: FlavorRow[] = [
+  { id: "f1", key: "blue_raspberry", label_en: "Blue Raspberry", label_es: "Blue Raspberry", active: true },
+  { id: "f2", key: "lemon_lime", label_en: "Lemon Lime", label_es: "Lemon Lime", active: true },
+  { id: "f3", key: "cherry", label_en: "Cherry", label_es: "Cereza", active: true },
+  { id: "f4", key: "pineapple", label_en: "Pineapple", label_es: "Piña", active: true },
+  { id: "f5", key: "kiwi", label_en: "Kiwi", label_es: "Kiwi", active: true },
+  { id: "f6", key: "watermelon", label_en: "Watermelon", label_es: "Sandía", active: true },
+  { id: "f7", key: "grape", label_en: "Grape", label_es: "Uva", active: false },
+  { id: "f8", key: "green_apple", label_en: "Green Apple", label_es: "Manzana Verde", active: true },
+  { id: "f9", key: "mixed_berry", label_en: "Mixed Berry", label_es: "Mezcla de Bayas", active: true },
+  { id: "f10", key: "peach", label_en: "Peach", label_es: "Durazno", active: false },
+  { id: "f11", key: "tangerine_natural", label_en: "Tangerine (All Natural)", label_es: "Mandarina (Natural)", active: true },
+  { id: "f12", key: "mango_natural", label_en: "Mango (All Natural)", label_es: "Mango (Natural)", active: true },
+];
+
 export default function AdminPage() {
   const { locale } = useLocale();
   const isEn = locale === "en";
@@ -53,6 +86,7 @@ export default function AdminPage() {
   const [flavors, setFlavors] = useState<FlavorRow[]>([]);
   const [counts, setCounts] = useState({ assessments: 0, mixes: 0, orders: 0 });
   const [search, setSearch] = useState("");
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -67,12 +101,16 @@ export default function AdminPage() {
           supabase.from("flavors").select("id, key, label_en, label_es, active").order("sort_order", { ascending: true }),
         ]);
         if (!active) return;
-        setAssessments(a.data ?? []);
-        setFlavors(fl.data ?? []);
+        const assessData = a.data ?? [];
+        const flavorData = fl.data ?? [];
+        const usingDemo = assessData.length === 0;
+        setIsDemoMode(usingDemo);
+        setAssessments(usingDemo ? DEMO_ASSESSMENTS : assessData);
+        setFlavors(flavorData.length > 0 ? flavorData : DEMO_FLAVORS);
         setCounts({
-          assessments: assessCount.count ?? 0,
-          mixes: mixCount.count ?? 0,
-          orders: orderCount.count ?? 0,
+          assessments: (assessCount.count ?? 0) || 47,
+          mixes: (mixCount.count ?? 0) || 38,
+          orders: (orderCount.count ?? 0) || 21,
         });
       } catch {
         // Supabase not configured — leave demo defaults.
@@ -136,7 +174,14 @@ export default function AdminPage() {
       <SiteHeader />
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-5xl">
-          <h1 className="text-3xl font-semibold tracking-tight">{isEn ? "Admin Portal" : "Portal de Administración"}</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-semibold tracking-tight">{isEn ? "Admin Portal" : "Portal de Administración"}</h1>
+            {isDemoMode && (
+              <span className="rounded-full border border-neutral-700 px-3 py-1 text-xs uppercase tracking-widest text-neutral-500">
+                {isEn ? "Demo Mode" : "Modo Demo"}
+              </span>
+            )}
+          </div>
 
           <div className="mt-8 flex gap-2 border-b border-neutral-900">
             {tabs.map((tb) => (

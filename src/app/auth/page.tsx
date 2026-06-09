@@ -44,11 +44,36 @@ export default function AuthPage() {
     }
   }
 
+  function fillDemo() {
+    setMode("signin");
+    setEmail("demo@carbyn.app");
+    setPassword("carbyn2025");
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-black">
       <SiteHeader />
       <main className="flex flex-1 flex-col items-center justify-center px-6 pt-28 pb-16">
         <div className="w-full max-w-sm">
+
+          {/* Demo credentials banner */}
+          <div className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-950 px-4 py-4">
+            <p className="text-xs uppercase tracking-widest text-neutral-500 mb-2">{isEn ? "Demo Access" : "Acceso Demo"}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-neutral-300 leading-relaxed">
+                <span className="text-neutral-500">{isEn ? "Email" : "Correo"}:</span> demo@carbyn.app<br />
+                <span className="text-neutral-500">{isEn ? "Password" : "Contraseña"}:</span> carbyn2025
+              </div>
+              <button
+                type="button"
+                onClick={fillDemo}
+                className="shrink-0 rounded-full border border-white px-4 py-2 text-xs text-white hover:bg-white hover:text-black transition-colors"
+              >
+                {isEn ? "Use demo" : "Usar demo"}
+              </button>
+            </div>
+          </div>
+
           <div className="mb-8 flex rounded-xl border border-neutral-800 p-1">
             {(["signin", "signup"] as const).map((m) => (
               <button
