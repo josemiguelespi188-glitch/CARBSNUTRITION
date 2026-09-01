@@ -82,9 +82,9 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-black">
+      <div className="flex min-h-screen flex-col bg-bg">
         <SiteHeader />
-        <main className="flex flex-1 items-center justify-center px-6 pt-28 pb-24 text-neutral-500">
+        <main className="flex flex-1 items-center justify-center px-6 pt-28 pb-24 text-ink-3">
           {isEn ? "Loading…" : "Cargando…"}
         </main>
       </div>
@@ -93,11 +93,11 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col bg-black">
+      <div className="flex min-h-screen flex-col bg-bg">
         <SiteHeader />
         <main className="flex flex-1 flex-col items-center justify-center px-6 pt-28 pb-24 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">{isEn ? "Your Dashboard" : "Tu Panel"}</h1>
-          <p className="mt-3 max-w-md text-neutral-400">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">{isEn ? "Your Dashboard" : "Tu Panel"}</h1>
+          <p className="mt-3 max-w-md text-ink-2">
             {isEn
               ? "Sign in to view your formulas, events, and scoop usage."
               : "Inicia sesión para ver tus fórmulas, eventos y uso de cucharadas."}
@@ -111,15 +111,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-black">
+    <div className="flex min-h-screen flex-col bg-bg">
       <SiteHeader />
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-4xl">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-semibold tracking-tight">{isEn ? "Athlete Dashboard" : "Panel del Atleta"}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-ink">{isEn ? "Athlete Dashboard" : "Panel del Atleta"}</h1>
             <Button variant="ghost" size="sm" onClick={signOut}>{isEn ? "Sign Out" : "Cerrar Sesión"}</Button>
           </div>
-          <p className="mt-2 text-sm text-neutral-500">{user.email}</p>
+          <p className="mt-2 text-sm text-ink-3">{user.email}</p>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
             <Card>
@@ -140,22 +140,22 @@ export default function DashboardPage() {
               <CardTitle>{isEn ? "Race Countdown" : "Cuenta Regresiva"}</CardTitle>
               <CardBody>
                 {daysToEvent !== null
-                  ? <span className="text-2xl font-semibold text-white">{daysToEvent} {isEn ? "days" : "días"}</span>
+                  ? <span className="text-2xl font-semibold text-ink">{daysToEvent} {isEn ? "days" : "días"}</span>
                   : (isEn ? "No upcoming event scheduled." : "No hay eventos próximos.")}
               </CardBody>
             </Card>
           </div>
 
-          <h2 className="mt-10 text-sm uppercase tracking-widest text-neutral-500">{isEn ? "My Formulas" : "Mis Fórmulas"}</h2>
+          <h2 className="mt-10 text-sm uppercase tracking-widest text-ink-3">{isEn ? "My Formulas" : "Mis Fórmulas"}</h2>
           <div className="mt-4 space-y-3">
             {mixes.length === 0 && (
-              <p className="text-sm text-neutral-500">{isEn ? "No saved formulas yet." : "Aún no tienes fórmulas guardadas."}</p>
+              <p className="text-sm text-ink-3">{isEn ? "No saved formulas yet." : "Aún no tienes fórmulas guardadas."}</p>
             )}
             {mixes.map((m) => (
               <Card key={m.id}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-medium text-white">{m.package_label}</p>
-                  <p className="text-xs text-neutral-400">
+                  <p className="font-medium text-ink">{m.package_label}</p>
+                  <p className="text-xs text-ink-2">
                     {m.carbs_per_serving ?? "—"}g · {m.sodium_per_serving ?? "—"}mg Na · {m.caffeine_per_serving ?? "—"}mg caf
                     {m.flavor ? ` · ${m.flavor.replace(/_/g, " ")}` : ""}
                   </p>
@@ -164,16 +164,16 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <h2 className="mt-10 text-sm uppercase tracking-widest text-neutral-500">{isEn ? "Upcoming Events" : "Próximos Eventos"}</h2>
+          <h2 className="mt-10 text-sm uppercase tracking-widest text-ink-3">{isEn ? "Upcoming Events" : "Próximos Eventos"}</h2>
           <div className="mt-4 space-y-3">
             {events.length === 0 && (
-              <p className="text-sm text-neutral-500">{isEn ? "No events yet." : "Aún no hay eventos."}</p>
+              <p className="text-sm text-ink-3">{isEn ? "No events yet." : "Aún no hay eventos."}</p>
             )}
             {events.map((e) => (
               <Card key={e.id}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-medium text-white">{e.event_name ?? "—"}</p>
-                  <p className="text-xs text-neutral-400">{e.event_date ?? "—"} · {e.sport_type ?? "—"}</p>
+                  <p className="font-medium text-ink">{e.event_name ?? "—"}</p>
+                  <p className="text-xs text-ink-2">{e.event_date ?? "—"} · {e.sport_type ?? "—"}</p>
                 </div>
               </Card>
             ))}

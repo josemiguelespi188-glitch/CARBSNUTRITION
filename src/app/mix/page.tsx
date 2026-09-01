@@ -33,7 +33,7 @@ const caffeineSteps = [0, 25, 50, 75, 100] as const;
 type ChatMsg = { role: "user" | "assistant"; text: string };
 
 export default function MixPage() {
-  const { t, locale } = useLocale();
+  const { locale } = useLocale();
   const router = useRouter();
 
   const [answers, setAnswers] = useState<AssessmentAnswers | null>(null);
@@ -45,10 +45,7 @@ export default function MixPage() {
   useEffect(() => {
     const a = sessionStorage.getItem("carbyn:answers");
     const m = sessionStorage.getItem("carbyn:mix");
-    if (!a || !m) {
-      router.replace("/assessment");
-      return;
-    }
+    if (!a || !m) { router.replace("/assessment"); return; }
     setAnswers(JSON.parse(a));
     setMix(JSON.parse(m));
   }, [router]);
@@ -65,6 +62,7 @@ export default function MixPage() {
   const raceDay = buildRaceDayPlan(answers, mix);
   const showDual = answers.caffeineGoal === "both" || answers.goal === "both";
   const dual = showDual ? buildDualMix(answers) : null;
+  const isEn = locale === "en";
 
   function update<K extends keyof FormulaRecommendation>(key: K, value: FormulaRecommendation[K]) {
     setMix((prev) => {
@@ -88,75 +86,63 @@ export default function MixPage() {
         body: JSON.stringify({ question, answers, formula: mix, locale }),
       });
       const data = await res.json();
-      setChat((c) => [...c, { role: "assistant", text: data.answer || (locale === "en" ? "Sorry, I couldn't process that." : "Lo siento, no pude procesar eso.") }]);
+      setChat((c) => [...c, { role: "assistant", text: data.answer || (isEn ? "Sorry, I couldn't process that." : "Lo siento, no pude procesar eso.") }]);
     } finally {
       setChatBusy(false);
     }
   }
 
-  const isEn = locale === "en";
-
   return (
-    <div className="flex min-h-screen flex-col bg-black">
+    <div className="flex min-h-screen flex-col bg-bg">
       <SiteHeader />
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-3xl">
+
           {/* Premium product mockup */}
-          <div className="mb-8 overflow-hidden rounded-3xl border border-neutral-800 bg-black">
-            <div className="bg-gradient-to-b from-neutral-900 to-black px-8 py-12 text-center">
-              <p className="text-[10px] uppercase tracking-[0.5em] text-neutral-600">CARBYN</p>
-              <h2 className="mt-4 text-3xl sm:text-5xl font-black uppercase tracking-tight text-white">
+          <div className="mb-8 overflow-hidden rounded-3xl border border-line bg-surface">
+            <div className="bg-gradient-to-b from-surface-2 to-surface px-8 py-12 text-center">
+              <p className="text-[10px] uppercase tracking-[0.5em] text-ink-3"
+                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
+                ZENIT
+              </p>
+              <h2 className="mt-4 text-3xl sm:text-5xl font-black uppercase tracking-tight text-ink"
+                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
                 {(answers.name.split(" ")[0] || answers.name).toUpperCase()}&apos;S CUSTOM FUEL
               </h2>
               {answers.eventName && (
-                <p className="mt-3 text-sm uppercase tracking-[0.25em] text-neutral-400">
+                <p className="mt-3 text-sm uppercase tracking-[0.25em] text-ink-2">
                   {isEn ? `Built for ${answers.eventName}` : `Hecho para ${answers.eventName}`}
                 </p>
               )}
-              <p className="mt-4 italic text-neutral-400">{mix.motivationalMessage[locale]}</p>
-              <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-neutral-700 px-5 py-2 text-xs text-neutral-300">
+              <p className="mt-4 italic text-ink-2">{mix.motivationalMessage[locale]}</p>
+              <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-line px-5 py-2 text-xs text-ink-2">
                 <span>{mix.carbsPerServing}g {isEn ? "carbs" : "carbos"}</span>
-                <span className="text-neutral-600">|</span>
+                <span className="opacity-30">|</span>
                 <span>{mix.sodiumPerServing}mg {isEn ? "sodium" : "sodio"}</span>
-                <span className="text-neutral-600">|</span>
+                <span className="opacity-30">|</span>
                 <span>{mix.caffeinePerServing}mg {isEn ? "caffeine" : "cafeína"}</span>
               </div>
             </div>
           </div>
 
-          {/* Package preview */}
-          <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 to-black p-8 text-center">
-            <p className="text-xs uppercase tracking-[0.4em] text-neutral-500">{isEn ? "Your Personalized Formula" : "Tu Fórmula Personalizada"}</p>
-            <h1 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">{mix.packageLabel}</h1>
-            <p className="mt-3 italic text-neutral-400">{mix.motivationalMessage[locale]}</p>
-            {answers.eventName && (
-              <p className="mt-1 text-sm text-neutral-500">
-                {isEn ? `Built for your ${answers.eventName} preparation.` : `Hecho para tu preparación de ${answers.eventName}.`}
-              </p>
-            )}
-          </div>
-
-          {/* AI explanation panel */}
+          {/* AI explanation */}
           <section className="mt-10">
-            <Card className="border-neutral-700">
+            <Card>
               <CardTitle>{isEn ? "Why We Recommended This" : "Por Qué Te Recomendamos Esto"}</CardTitle>
               <div className="mt-4 space-y-3">
                 {mix.reasoning.map((r) => (
-                  <p key={r.field} className="text-sm text-neutral-400 leading-relaxed">
-                    {r.explanation[locale]}
-                  </p>
+                  <p key={r.field} className="text-sm text-ink-2 leading-relaxed">{r.explanation[locale]}</p>
                 ))}
               </div>
             </Card>
           </section>
 
-          {/* Custom mix editor */}
+          {/* Mix editor */}
           <section className="mt-10">
-            <h2 className="text-xl font-semibold tracking-tight">{isEn ? "Your Mix Editor" : "Tu Editor de Mezcla"}</h2>
-            <p className="mt-1 text-sm text-neutral-500">
+            <h2 className="text-xl font-semibold tracking-tight text-ink">{isEn ? "Your Mix Editor" : "Tu Editor de Mezcla"}</h2>
+            <p className="mt-1 text-sm text-ink-3">
               {isEn ? "Adjust any value — we'll let you know if you stray far from your recommendation." : "Ajusta cualquier valor — te avisaremos si te alejas mucho de tu recomendación."}
             </p>
-
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <EditorField label={isEn ? "Carbs per serving" : "Carbohidratos por porción"}>
                 <StepSelect value={mix.carbsPerServing} steps={carbSteps} suffix="g" onChange={(v) => update("carbsPerServing", v as FormulaRecommendation["carbsPerServing"])} />
@@ -171,7 +157,7 @@ export default function MixPage() {
                 <div className="flex gap-2">
                   {(["1:0.8", "2:1"] as const).map((r) => (
                     <button key={r} onClick={() => update("ratio", r)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.ratio === r ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.ratio === r ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
                       {r}
                     </button>
                   ))}
@@ -181,7 +167,7 @@ export default function MixPage() {
                 <div className="flex gap-2">
                   {(["lite", "regular", "mega"] as const).map((s) => (
                     <button key={s} onClick={() => update("flavorStrength", s)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${mix.flavorStrength === s ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${mix.flavorStrength === s ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
                       {s}
                     </button>
                   ))}
@@ -191,7 +177,7 @@ export default function MixPage() {
                 <div className="flex gap-2">
                   {(["yes", "no"] as const).map((v) => (
                     <button key={v} onClick={() => update("preservatives", v)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.preservatives === v ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.preservatives === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
                       {v === "yes" ? (isEn ? "Yes (recommended)" : "Sí (recomendado)") : (isEn ? "No preservatives" : "Sin conservadores")}
                     </button>
                   ))}
@@ -201,18 +187,17 @@ export default function MixPage() {
                 <div className="flex gap-2">
                   {(["yes", "no"] as const).map((v) => (
                     <button key={v} onClick={() => update("scooper", v)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.scooper === v ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}>
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.scooper === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
                       {v === "yes" ? (isEn ? "Yes" : "Sí") : "No"}
                     </button>
                   ))}
                 </div>
               </EditorField>
             </div>
-
             {warnings.length > 0 && (
               <div className="mt-6 space-y-2">
                 {warnings.map((w) => (
-                  <div key={w} className="rounded-xl border border-neutral-600 bg-neutral-950 px-4 py-3 text-sm text-neutral-300">
+                  <div key={w} className="rounded-xl border border-accent-2 bg-surface px-4 py-3 text-sm text-ink-2">
                     ⚠️ {editWarningCopy[w][locale]}
                   </div>
                 ))}
@@ -225,15 +210,8 @@ export default function MixPage() {
             <Card>
               <CardTitle>{isEn ? "Recommended Supply" : "Suministro Recomendado"}</CardTitle>
               <CardBody>
-                <p className="text-base text-white font-medium">{pack.label[locale]}</p>
+                <p className="text-base text-ink font-medium">{pack.label[locale]}</p>
                 <p className="mt-2">{pack.reasoning[locale]}</p>
-                {pack.bundleRaceFormula && (
-                  <p className="mt-3 rounded-lg border border-neutral-700 px-4 py-3 text-neutral-300">
-                    {isEn
-                      ? "We also suggest pairing this with a separate Race Day Formula — tuned specifically for competition demands."
-                      : "También sugerimos combinarlo con una Fórmula de Día de Carrera independiente — ajustada específicamente para las exigencias de competencia."}
-                  </p>
-                )}
               </CardBody>
             </Card>
           </section>
@@ -242,80 +220,51 @@ export default function MixPage() {
           <section className="mt-10">
             <Card>
               <CardTitle>{isEn ? "Scoop Plan" : "Plan de Cucharadas"}</CardTitle>
-              <div className="mt-2 flex flex-wrap gap-6 text-sm text-neutral-300">
-                <span>{isEn ? "Total scoops:" : "Cucharadas totales:"} <span className="font-semibold text-white">{totalScoops}</span></span>
+              <div className="mt-2 flex flex-wrap gap-6 text-sm text-ink-2">
+                <span>{isEn ? "Total scoops:" : "Cucharadas totales:"} <span className="font-semibold text-ink">{totalScoops}</span></span>
                 {weeksToEvent !== null && (
-                  <span>{isEn ? "Weeks until event:" : "Semanas hasta el evento:"} <span className="font-semibold text-white">{weeksToEvent}</span></span>
+                  <span>{isEn ? "Weeks until event:" : "Semanas hasta el evento:"} <span className="font-semibold text-ink">{weeksToEvent}</span></span>
                 )}
               </div>
               <div className="mt-6 h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={scoopPlan} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                    <CartesianGrid stroke="#262626" vertical={false} />
-                    <XAxis dataKey="week" stroke="#737373" fontSize={11} tickLine={false} />
-                    <YAxis stroke="#737373" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      cursor={{ fill: "#171717" }}
-                      contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", borderRadius: 8, color: "#fff" }}
+                    <CartesianGrid stroke="var(--line)" vertical={false} />
+                    <XAxis dataKey="week" stroke="var(--ink-3)" fontSize={11} tickLine={false} />
+                    <YAxis stroke="var(--ink-3)" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip cursor={{ fill: "var(--surface-2)" }}
+                      contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--ink)" }}
                       labelFormatter={(w) => (isEn ? `Week ${w}` : `Semana ${w}`)}
                     />
-                    <Bar dataKey="scoops" fill="#ffffff" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="scoops" fill="var(--accent-1)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </Card>
           </section>
 
-          {/* Race day fueling plan */}
+          {/* Race day plan */}
           <section className="mt-10">
             <Card>
               <CardTitle>{isEn ? "Race Day Fueling Plan" : "Plan de Alimentación del Día de Carrera"}</CardTitle>
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <PhaseCard
-                  title={isEn ? "Pre-Race" : "Pre-Carrera"}
-                  metric={`${raceDay.preRace.carbs}g`}
-                  desc={raceDay.preRace.description[locale]}
-                />
-                {raceDay.bike && (
-                  <PhaseCard
-                    title={isEn ? "Bike" : "Bici"}
-                    metric={`${raceDay.bike.carbsPerHour}g/h`}
-                    desc={raceDay.bike.description[locale]}
-                  />
-                )}
-                {raceDay.run && (
-                  <PhaseCard
-                    title={isEn ? "Run" : "Carrera"}
-                    metric={`${raceDay.run.carbsPerHour}g/h`}
-                    desc={raceDay.run.description[locale]}
-                  />
-                )}
-                <PhaseCard
-                  title={isEn ? "Recovery" : "Recuperación"}
-                  metric={`${raceDay.recovery.carbs}g`}
-                  desc={raceDay.recovery.description[locale]}
-                />
+                <PhaseCard title={isEn ? "Pre-Race" : "Pre-Carrera"} metric={`${raceDay.preRace.carbs}g`} desc={raceDay.preRace.description[locale]} />
+                {raceDay.bike && <PhaseCard title={isEn ? "Bike" : "Bici"} metric={`${raceDay.bike.carbsPerHour}g/h`} desc={raceDay.bike.description[locale]} />}
+                {raceDay.run && <PhaseCard title={isEn ? "Run" : "Carrera"} metric={`${raceDay.run.carbsPerHour}g/h`} desc={raceDay.run.description[locale]} />}
+                <PhaseCard title={isEn ? "Recovery" : "Recuperación"} metric={`${raceDay.recovery.carbs}g`} desc={raceDay.recovery.description[locale]} />
               </div>
             </Card>
           </section>
 
-          {/* Dual mix view */}
+          {/* Dual mix */}
           {dual && (
             <section className="mt-10">
               <Card>
                 <CardTitle>{isEn ? "Training Mix vs Race Mix" : "Mezcla de Entrenamiento vs Carrera"}</CardTitle>
-                <p className="mt-2 text-sm text-neutral-400 leading-relaxed">{dual.reasoning[locale]}</p>
+                <p className="mt-2 text-sm text-ink-2 leading-relaxed">{dual.reasoning[locale]}</p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <MixSummary
-                    title={isEn ? "Training Mix" : "Mezcla de Entrenamiento"}
-                    formula={dual.training}
-                    isEn={isEn}
-                  />
-                  <MixSummary
-                    title={isEn ? "Race Mix" : "Mezcla de Carrera"}
-                    formula={dual.race}
-                    isEn={isEn}
-                  />
+                  <MixSummary title={isEn ? "Training Mix" : "Mezcla de Entrenamiento"} formula={dual.training} isEn={isEn} />
+                  <MixSummary title={isEn ? "Race Mix" : "Mezcla de Carrera"} formula={dual.race} isEn={isEn} />
                 </div>
               </Card>
             </section>
@@ -325,33 +274,29 @@ export default function MixPage() {
           <section className="mt-10">
             <Card>
               <CardTitle>{isEn ? "Ask Our AI Advisor" : "Pregúntale a Nuestro Asesor de IA"}</CardTitle>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm text-ink-3">
                 {isEn ? `e.g. "Why did you give me ${mix.sodiumPerServing}mg of sodium?"` : `Ej. "¿Por qué me diste ${mix.sodiumPerServing}mg de sodio?"`}
               </p>
               <div className="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
                 {chat.map((m, i) => (
-                  <div key={i} className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "ml-8 bg-white text-black" : "mr-8 bg-neutral-900 text-neutral-300"}`}>
+                  <div key={i} className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "ml-8 bg-ink text-bg" : "mr-8 bg-surface-2 text-ink-2"}`}>
                     {m.text}
                   </div>
                 ))}
-                {chatBusy && <div className="mr-8 rounded-xl bg-neutral-900 px-4 py-2.5 text-sm text-neutral-500">{isEn ? "Thinking…" : "Pensando…"}</div>}
+                {chatBusy && <div className="mr-8 rounded-xl bg-surface-2 px-4 py-2.5 text-sm text-ink-3">{isEn ? "Thinking…" : "Pensando…"}</div>}
               </div>
               <div className="mt-4 flex gap-2">
-                <input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && sendChat()}
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendChat()}
                   placeholder={isEn ? "Type your question…" : "Escribe tu pregunta…"}
-                  className="flex-1 rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-white focus:outline-none"
-                />
+                  className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none" />
                 <Button size="sm" onClick={sendChat} disabled={chatBusy || !chatInput.trim()}>{isEn ? "Send" : "Enviar"}</Button>
               </div>
             </Card>
           </section>
 
           <div className="mt-12 flex flex-col items-center gap-3 text-center">
-            <Button size="lg">{isEn ? "Order This Formula" : "Ordenar Esta Fórmula"}</Button>
-            <Link href="/assessment" className="text-xs text-neutral-500 underline underline-offset-4 hover:text-neutral-300">
+            <Button variant="accent" size="lg">{isEn ? "Order This Formula" : "Ordenar Esta Fórmula"}</Button>
+            <Link href="/assessment" className="text-xs text-ink-3 underline underline-offset-4 hover:text-ink-2">
               {isEn ? "Retake the assessment" : "Repetir la evaluación"}
             </Link>
           </div>
@@ -363,12 +308,12 @@ export default function MixPage() {
 
 function PhaseCard({ title, metric, desc }: { title: string; metric: string; desc: string }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+    <div className="rounded-xl border border-line bg-surface-2 p-5">
       <div className="flex items-baseline justify-between">
-        <p className="text-xs uppercase tracking-widest text-neutral-500">{title}</p>
-        <p className="text-lg font-semibold text-white">{metric}</p>
+        <p className="text-xs uppercase tracking-widest text-ink-3">{title}</p>
+        <p className="text-lg font-semibold text-ink">{metric}</p>
       </div>
-      <p className="mt-3 text-sm text-neutral-400 leading-relaxed">{desc}</p>
+      <p className="mt-3 text-sm text-ink-2 leading-relaxed">{desc}</p>
     </div>
   );
 }
@@ -381,13 +326,13 @@ function MixSummary({ title, formula, isEn }: { title: string; formula: FormulaR
     [isEn ? "Flavor" : "Sabor", formula.flavor.replace(/_/g, " ")],
   ];
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
-      <p className="text-sm font-semibold uppercase tracking-widest text-white">{title}</p>
+    <div className="rounded-xl border border-line bg-surface-2 p-5">
+      <p className="text-sm font-semibold uppercase tracking-widest text-ink">{title}</p>
       <dl className="mt-4 space-y-2">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-center justify-between text-sm">
-            <dt className="text-neutral-500">{k}</dt>
-            <dd className="capitalize text-neutral-200">{v}</dd>
+            <dt className="text-ink-3">{k}</dt>
+            <dd className="capitalize text-ink-2">{v}</dd>
           </div>
         ))}
       </dl>
@@ -398,7 +343,7 @@ function MixSummary({ title, formula, isEn }: { title: string; formula: FormulaR
 function EditorField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-2 block text-xs uppercase tracking-widest text-neutral-500">{label}</label>
+      <label className="mb-2 block text-xs uppercase tracking-widest text-ink-3">{label}</label>
       {children}
     </div>
   );
@@ -408,11 +353,8 @@ function StepSelect<T extends number>({ value, steps, suffix, onChange }: { valu
   return (
     <div className="flex flex-wrap gap-2">
       {steps.map((s) => (
-        <button
-          key={s}
-          onClick={() => onChange(s)}
-          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${value === s ? "border-white bg-white text-black font-medium" : "border-neutral-700 text-neutral-300 hover:border-neutral-400"}`}
-        >
+        <button key={s} onClick={() => onChange(s)}
+          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${value === s ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
           {s}{suffix}
         </button>
       ))}
