@@ -151,9 +151,7 @@ export default function AdminPage() {
     setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, active: next } : x)));
     try {
       await supabase.from("flavors").update({ active: next }).eq("id", f.id);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }
 
   const tabs: { key: Tab; en: string; es: string }[] = [
@@ -170,28 +168,25 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="flex min-h-screen flex-col bg-black">
+    <div className="flex min-h-screen flex-col bg-bg">
       <SiteHeader />
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-5xl">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-semibold tracking-tight">{isEn ? "Admin Portal" : "Portal de Administración"}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-ink">{isEn ? "Admin Portal" : "Portal de Administración"}</h1>
             {isDemoMode && (
-              <span className="rounded-full border border-neutral-700 px-3 py-1 text-xs uppercase tracking-widest text-neutral-500">
+              <span className="rounded-full border border-line px-3 py-1 text-xs uppercase tracking-widest text-ink-3">
                 {isEn ? "Demo Mode" : "Modo Demo"}
               </span>
             )}
           </div>
 
-          <div className="mt-8 flex gap-2 border-b border-neutral-900">
+          <div className="mt-8 flex gap-2 border-b border-line">
             {tabs.map((tb) => (
-              <button
-                key={tb.key}
-                onClick={() => setTab(tb.key)}
+              <button key={tb.key} onClick={() => setTab(tb.key)}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm transition-colors ${
-                  tab === tb.key ? "border-white text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"
-                }`}
-              >
+                  tab === tb.key ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink-2"
+                }`}>
                 {isEn ? tb.en : tb.es}
               </button>
             ))}
@@ -202,8 +197,8 @@ export default function AdminPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {kpis.map((k) => (
                   <Card key={k.label} className="text-center">
-                    <p className="text-xs uppercase tracking-widest text-neutral-500">{k.label}</p>
-                    <p className="mt-3 text-2xl font-semibold capitalize text-white">{k.value}</p>
+                    <p className="text-xs uppercase tracking-widest text-ink-3">{k.label}</p>
+                    <p className="mt-3 text-2xl font-semibold capitalize text-ink">{k.value}</p>
                   </Card>
                 ))}
               </div>
@@ -214,11 +209,11 @@ export default function AdminPage() {
                   <div className="mt-4 h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={signupTrend} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                        <CartesianGrid stroke="#262626" vertical={false} />
-                        <XAxis dataKey="month" stroke="#737373" fontSize={11} tickLine={false} />
-                        <YAxis stroke="#737373" fontSize={11} tickLine={false} axisLine={false} />
-                        <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", borderRadius: 8, color: "#fff" }} />
-                        <Line type="monotone" dataKey="count" stroke="#ffffff" strokeWidth={2} dot={false} />
+                        <CartesianGrid stroke="var(--line)" vertical={false} />
+                        <XAxis dataKey="month" stroke="var(--ink-3)" fontSize={11} tickLine={false} />
+                        <YAxis stroke="var(--ink-3)" fontSize={11} tickLine={false} axisLine={false} />
+                        <Tooltip contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--ink)" }} />
+                        <Line type="monotone" dataKey="count" stroke="var(--accent-1)" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -229,11 +224,11 @@ export default function AdminPage() {
                   <div className="mt-4 h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={sportChart} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                        <CartesianGrid stroke="#262626" vertical={false} />
-                        <XAxis dataKey="sport" stroke="#737373" fontSize={11} tickLine={false} />
-                        <YAxis stroke="#737373" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
-                        <Tooltip cursor={{ fill: "#171717" }} contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", borderRadius: 8, color: "#fff" }} />
-                        <Bar dataKey="count" fill="#ffffff" radius={[4, 4, 0, 0]} />
+                        <CartesianGrid stroke="var(--line)" vertical={false} />
+                        <XAxis dataKey="sport" stroke="var(--ink-3)" fontSize={11} tickLine={false} />
+                        <YAxis stroke="var(--ink-3)" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <Tooltip cursor={{ fill: "var(--surface-2)" }} contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--ink)" }} />
+                        <Bar dataKey="count" fill="var(--accent-2)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -244,15 +239,12 @@ export default function AdminPage() {
 
           {tab === "athletes" && (
             <div className="mt-8">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+              <input value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={isEn ? "Search by name or email…" : "Buscar por nombre o correo…"}
-                className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:border-white focus:outline-none"
-              />
-              <div className="mt-6 overflow-x-auto rounded-2xl border border-neutral-900">
+                className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none" />
+              <div className="mt-6 overflow-x-auto rounded-2xl border border-line">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-neutral-900 text-xs uppercase tracking-widest text-neutral-500">
+                  <thead className="border-b border-line text-xs uppercase tracking-widest text-ink-3">
                     <tr>
                       <th className="px-4 py-3">{isEn ? "Name" : "Nombre"}</th>
                       <th className="px-4 py-3">{isEn ? "Email" : "Correo"}</th>
@@ -265,17 +257,17 @@ export default function AdminPage() {
                     {filtered.map((a) => {
                       const ans = a.answers as { sportType?: string; eventName?: string } | null;
                       return (
-                        <tr key={a.id} className="border-b border-neutral-900 last:border-0">
-                          <td className="px-4 py-3 text-white">{a.name}</td>
-                          <td className="px-4 py-3 text-neutral-400">{a.email}</td>
-                          <td className="px-4 py-3 capitalize text-neutral-400">{ans?.sportType ?? "—"}</td>
-                          <td className="px-4 py-3 text-neutral-400">{ans?.eventName || "—"}</td>
-                          <td className="px-4 py-3 text-neutral-500">{new Date(a.created_at).toLocaleDateString()}</td>
+                        <tr key={a.id} className="border-b border-line last:border-0">
+                          <td className="px-4 py-3 text-ink">{a.name}</td>
+                          <td className="px-4 py-3 text-ink-2">{a.email}</td>
+                          <td className="px-4 py-3 capitalize text-ink-2">{ans?.sportType ?? "—"}</td>
+                          <td className="px-4 py-3 text-ink-2">{ans?.eventName || "—"}</td>
+                          <td className="px-4 py-3 text-ink-3">{new Date(a.created_at).toLocaleDateString()}</td>
                         </tr>
                       );
                     })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-neutral-600">{isEn ? "No athletes found." : "No se encontraron atletas."}</td></tr>
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-3">{isEn ? "No athletes found." : "No se encontraron atletas."}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -286,23 +278,21 @@ export default function AdminPage() {
           {tab === "config" && (
             <div className="mt-8">
               <CardTitle>{isEn ? "Flavor Catalog" : "Catálogo de Sabores"}</CardTitle>
-              <p className="mt-1 text-sm text-neutral-500">{isEn ? "Toggle flavors active or inactive." : "Activa o desactiva sabores."}</p>
+              <p className="mt-1 text-sm text-ink-3">{isEn ? "Toggle flavors active or inactive." : "Activa o desactiva sabores."}</p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {flavors.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3">
-                    <span className="text-sm text-white">{isEn ? f.label_en : f.label_es}</span>
-                    <button
-                      onClick={() => toggleFlavor(f)}
+                  <div key={f.id} className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
+                    <span className="text-sm text-ink">{isEn ? f.label_en : f.label_es}</span>
+                    <button onClick={() => toggleFlavor(f)}
                       className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                        f.active ? "border-white bg-white text-black" : "border-neutral-700 text-neutral-400"
-                      }`}
-                    >
+                        f.active ? "border-ink bg-ink text-bg" : "border-line text-ink-3"
+                      }`}>
                       {f.active ? (isEn ? "Active" : "Activo") : (isEn ? "Inactive" : "Inactivo")}
                     </button>
                   </div>
                 ))}
                 {flavors.length === 0 && (
-                  <p className="text-sm text-neutral-600">{isEn ? "Connect Supabase to manage flavors." : "Conecta Supabase para administrar sabores."}</p>
+                  <p className="text-sm text-ink-3">{isEn ? "Connect Supabase to manage flavors." : "Conecta Supabase para administrar sabores."}</p>
                 )}
               </div>
             </div>
