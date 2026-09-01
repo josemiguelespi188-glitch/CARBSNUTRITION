@@ -1,14 +1,15 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "outline";
+type Variant = "primary" | "secondary" | "ghost" | "outline" | "accent";
 type Size = "default" | "lg" | "sm";
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-white text-black hover:bg-neutral-200",
-  secondary: "bg-neutral-800 text-white hover:bg-neutral-700",
-  outline: "border border-neutral-600 text-white hover:border-white",
-  ghost: "text-white hover:bg-neutral-800",
+  primary: "bg-ink text-bg hover:opacity-90",
+  accent: "bg-accent-1 text-[#F3F3F1] hover:opacity-90",
+  secondary: "bg-surface-2 text-ink hover:bg-line",
+  outline: "border border-line text-ink hover:border-ink",
+  ghost: "text-ink-2 hover:text-ink hover:bg-surface-2",
 };
 
 const sizeClasses: Record<Size, string> = {

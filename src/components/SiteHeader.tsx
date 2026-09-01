@@ -31,28 +31,36 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 border-b border-neutral-900 bg-black/70 backdrop-blur-md">
+    <header className="fixed top-0 inset-x-0 z-50 border-b border-line bg-bg/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-lg font-bold tracking-[0.3em] text-white">
-          {t.brand.name}
+        <Link href="/" className="flex flex-col leading-none">
+          <span
+            className="text-lg font-black tracking-[0.25em] text-ink"
+            style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}
+          >
+            {t.brand.name}
+          </span>
+          <span className="text-[9px] uppercase tracking-[0.5em] text-ink-3 -mt-0.5">
+            nutrition
+          </span>
         </Link>
         <nav className="hidden items-center gap-6 sm:flex">
           {signedIn ? (
             <>
-              <Link href="/dashboard" className="text-sm text-neutral-400 hover:text-white transition-colors">
+              <Link href="/dashboard" className="text-sm text-ink-2 hover:text-ink transition-colors">
                 {t.nav.dashboard}
               </Link>
-              <button onClick={signOut} className="text-sm text-neutral-400 hover:text-white transition-colors">
+              <button onClick={signOut} className="text-sm text-ink-2 hover:text-ink transition-colors">
                 {isEn ? "Sign Out" : "Cerrar Sesión"}
               </button>
             </>
           ) : (
-            <Link href="/auth" className="text-sm text-neutral-400 hover:text-white transition-colors">
+            <Link href="/auth" className="text-sm text-ink-2 hover:text-ink transition-colors">
               {isEn ? "Sign In" : "Iniciar Sesión"}
             </Link>
           )}
-          <Link href="/admin" className="text-sm text-neutral-500 hover:text-white transition-colors">
-            {isEn ? "Admin" : "Admin"}
+          <Link href="/admin" className="text-sm text-ink-3 hover:text-ink transition-colors">
+            Admin
           </Link>
           <LanguageSwitch />
           <Link href="/assessment">
