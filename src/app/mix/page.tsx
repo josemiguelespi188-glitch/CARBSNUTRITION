@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
+import { AiPanel } from "@/components/AiPanel";
 import { AssessmentAnswers, CustomMix, FormulaRecommendation } from "@/lib/types";
-import { assembleCustomMix, editWarningCopy, getEditWarnings } from "@/lib/recommendation";
+import { assembleCustomMix, buildRecommendation, editWarningCopy, getEditWarnings } from "@/lib/recommendation";
 
-type Stage = "quiz" | "formula" | "refine" | "quantity" | "order";
+type Stage = "formula" | "refine" | "quantity" | "order";
 
 const BRAND_FLAVORS = [
   { key: "peach",     en: "Peach",     es: "Durazno", color: "#E8946A" },
@@ -39,661 +40,625 @@ const DEFAULT_ANSWERS: AssessmentAnswers = {
   pastIssuesWithGels: "no", pastIssuesWithSportsDrinks: "no",
 };
 
-export default function MixPage() {
-  const { locale } = useLocale();
-  const router = useRouter();
-  const isEn = locale === "en";
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
-  const [stage, setStage] = useState<Stage>("quiz");
-  const [quizStep, setQuizStep] = useState(0);
-  const [answers, setAnswers] = useState<AssessmentAnswers>(DEFAULT_ANSWERS);
-  const [mix, setMix]         = useState<CustomMix | null>(null);
-  const [flavorKey, setFlavorKey] = useState("peach");
-  const [qty, setQty]     = useState(3);
-  const [racePack, setRacePack] = useState(false);
-  const [ordered, setOrdered]  = useState(false);
-
-  useEffect(() => {
-    try {
-      // Restore user identity
-      const u = sessionStorage.getItem("zenit:user");
-      if (u) {
-        const { name, email, phone } = JSON.parse(u) as { name: string; email: string; phone: string };
-        setAnswers(p => ({ ...p, name, email, phone }));
-      }
-      // Pre-selected flavor
-      const f = sessionStorage.getItem("zenit:flavor");
-      if (f && BRAND_FLAVORS.find(x => x.key === f)) setFlavorKey(f);
-      // Existing mix (e.g. returning user)
-      const a = sessionStorage.getItem("carbyn:answers");
-      const m = sessionStorage.getItem("carbyn:mix");
-      if (a && m) {
-        const parsedAnswers = JSON.parse(a) as AssessmentAnswers;
-        setAnswers(parsedAnswers);
-        setMix(JSON.parse(m) as CustomMix);
-        setStage("formula"); // skip quiz if we have data
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  // ─── Quiz helpers ───────────────────────────────────────────────────────────
-  const QUIZ = [
-    {
-      key: "sportType" as const,
-      label: { en: "What's your sport?", es: "¿Cuál es tu deporte?" },
-      options: [
-        { v: "marathon",  en: "Marathon",     es: "Maratón" },
-        { v: "ironman",   en: "Ironman",      es: "Ironman" },
-        { v: "triathlon", en: "Triathlon",    es: "Triatlón" },
-        { v: "cycling",   en: "Cycling",      es: "Ciclismo" },
-        { v: "ultra",     en: "Ultra Running",es: "Ultra Running" },
-        { v: "trail",     en: "Trail Running",es: "Trail Running" },
-        { v: "other",     en: "Other",        es: "Otro" },
-      ],
-    },
-    {
-      key: "goal" as const,
-      label: { en: "What are you training for right now?", es: "¿Para qué estás entrenando ahora?" },
-      options: [
-        { v: "race",     en: "An upcoming race",       es: "Una carrera próxima" },
-        { v: "training", en: "General training",        es: "Entrenamiento general" },
-        { v: "both",     en: "Training + racing season",es: "Entrenamiento y temporada de carreras" },
-      ],
-    },
-    {
-      key: "caffeineTolerance" as const,
-      label: { en: "Your caffeine tolerance?", es: "¿Tu tolerancia a la cafeína?" },
-      options: [
-        { v: "none",   en: "None — I avoid it",          es: "Ninguna — lo evito" },
-        { v: "low",    en: "Low — sensitive",             es: "Baja — sensible" },
-        { v: "medium", en: "Medium — 1–2 cups/day",      es: "Media — 1–2 tazas/día" },
-        { v: "high",   en: "High — drink it all day",     es: "Alta — tomo todo el día" },
-      ],
-    },
-  ] as const;
-
-  function quizSelect(v: string) {
-    const field = QUIZ[quizStep].key;
-    const next = { ...answers, [field]: v, flavorPreferences: [flavorKey] };
-    setAnswers(next);
-    if (quizStep < QUIZ.length - 1) {
-      setQuizStep(s => s + 1);
-    } else {
-      // Generate initial formula
-      const m = assembleCustomMix(next);
-      setMix(m);
-      try {
-        sessionStorage.setItem("carbyn:answers", JSON.stringify(next));
-        sessionStorage.setItem("carbyn:mix", JSON.stringify(m));
-      } catch { /* ignore */ }
-      setStage("formula");
-    }
-  }
-
-  // ─── Formula / mix editor helpers ─────────────────────────────────────────
-  function updateMix<K extends keyof FormulaRecommendation>(key: K, value: FormulaRecommendation[K]) {
-    setMix(prev => {
-      if (!prev) return prev;
-      const next = { ...prev, [key]: value };
-      try { sessionStorage.setItem("carbyn:mix", JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }
-
-  function updateAnswers<K extends keyof AssessmentAnswers>(key: K, value: AssessmentAnswers[K]) {
-    setAnswers(prev => {
-      const next = { ...prev, [key]: value };
-      try { sessionStorage.setItem("carbyn:answers", JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }
-
-  // When moving from refine → quantity, re-run formula with full profile
-  function goToQuantity() {
-    const fullAnswers = { ...answers, flavorPreferences: [flavorKey] };
-    const refreshed = assembleCustomMix(fullAnswers);
-    setMix(refreshed);
-    try { sessionStorage.setItem("carbyn:mix", JSON.stringify(refreshed)); } catch { /* ignore */ }
-    setStage("quantity");
-  }
-
-  const flavor = BRAND_FLAVORS.find(f => f.key === flavorKey) ?? BRAND_FLAVORS[0];
-  const warnings = mix ? getEditWarnings(mix, mix) : [];
-  const priceOption = PRICE_OPTIONS.find(o => o.qty === qty) ?? PRICE_OPTIONS[1];
-  const total = priceOption.price + (racePack ? RACE_PACK_PRICE : 0);
-  const firstName = answers.name.split(" ")[0] || answers.name || "Athlete";
-
-  const STAGE_LABELS = [
-    { key: "quiz",     en: "Formula",  es: "Fórmula" },
-    { key: "formula",  en: "Formula",  es: "Fórmula" },
-    { key: "refine",   en: "Refine",   es: "Perfeccionar" },
-    { key: "quantity", en: "Quantity", es: "Cantidad" },
-    { key: "order",    en: "Order",    es: "Pedido" },
-  ] as const;
-  const BREADCRUMB = [
-    { keys: ["quiz", "formula"] as Stage[], en: "Formula",  es: "Fórmula" },
-    { keys: ["refine"] as Stage[],          en: "Refine",   es: "Perfeccionar" },
-    { keys: ["quantity"] as Stage[],        en: "Quantity", es: "Cantidad" },
-    { keys: ["order"] as Stage[],           en: "Order",    es: "Pedido" },
-  ];
-  void STAGE_LABELS;
-
+function ProductBag({ flavor, mix, mini = false }: { flavor: string; mix: CustomMix | null; mini?: boolean }) {
+  const f = BRAND_FLAVORS.find(x => x.key === flavor) ?? BRAND_FLAVORS[0];
+  const size = mini ? 120 : 220;
   return (
-    <div className="flex min-h-screen flex-col bg-bg">
-      <SiteHeader />
-      <main className="flex-1 px-6 pt-28 pb-24">
-        <div className="mx-auto max-w-3xl">
-
-          {/* Breadcrumb */}
-          {stage !== "quiz" && (
-            <div className="flex items-center gap-2 mb-10">
-              {BREADCRUMB.map((b, i) => {
-                const active = b.keys.includes(stage);
-                const past = BREADCRUMB.findIndex(x => x.keys.includes(stage)) > i;
-                return (
-                  <div key={b.en} className="flex items-center gap-2">
-                    <span className={`text-xs uppercase tracking-widest ${active ? "text-ink font-semibold" : past ? "text-ink-3" : "text-line"}`}>
-                      {isEn ? b.en : b.es}
-                    </span>
-                    {i < BREADCRUMB.length - 1 && <span className="text-line text-xs">→</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ─── STAGE: QUIZ ─────────────────────────────────────────────── */}
-          {stage === "quiz" && (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <p className="text-xs uppercase tracking-[0.4em] text-ink-3 mb-2">
-                {isEn ? `Question ${quizStep + 1} of ${QUIZ.length}` : `Pregunta ${quizStep + 1} de ${QUIZ.length}`}
-              </p>
-              <div className="mb-3 h-1 w-32 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full bg-ink transition-all duration-300" style={{ width: `${((quizStep + 1) / QUIZ.length) * 100}%` }} />
-              </div>
-              <h1 className="mt-6 text-2xl sm:text-3xl font-semibold tracking-tight text-ink max-w-lg">
-                {QUIZ[quizStep].label[locale]}
-              </h1>
-              <div className="mt-8 grid gap-3 w-full max-w-md">
-                {QUIZ[quizStep].options.map(o => (
-                  <button key={o.v} onClick={() => quizSelect(o.v)}
-                    className="rounded-2xl border border-line px-5 py-4 text-sm text-ink-2 hover:border-ink hover:text-ink transition-colors text-left">
-                    {isEn ? o.en : o.es}
-                  </button>
-                ))}
-              </div>
-              {quizStep > 0 && (
-                <button className="mt-6 text-xs text-ink-3 underline underline-offset-4 hover:text-ink-2" onClick={() => setQuizStep(s => s - 1)}>
-                  {isEn ? "Back" : "Atrás"}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* ─── STAGE: FORMULA ──────────────────────────────────────────── */}
-          {stage === "formula" && mix && (
-            <div>
-              <div className="flex flex-col lg:flex-row gap-10 items-start">
-                <div className="shrink-0 mx-auto lg:mx-0">
-                  <ProductBag flavor={flavor} isEn={isEn} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs uppercase tracking-[0.4em] text-ink-3">zenit</p>
-                  <h1 className="mt-2 text-3xl sm:text-4xl font-black uppercase tracking-tight text-ink"
-                    style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>
-                    {firstName.toUpperCase()}&apos;S FUEL
-                  </h1>
-                  <p className="mt-2 italic text-ink-3 text-sm">{mix.motivationalMessage[locale]}</p>
-                  <div className="mt-6 divide-y divide-line border-y border-line">
-                    {([
-                      [isEn ? "Carbohydrates" : "Carbohidratos", `${mix.carbsPerServing} g`],
-                      [isEn ? "Sodium" : "Sodio", `${mix.sodiumPerServing} mg`],
-                      [isEn ? "Caffeine" : "Cafeína", `${mix.caffeinePerServing} mg`],
-                      [isEn ? "Ratio" : "Proporción", mix.ratio],
-                      [isEn ? "Calories/serving" : "Calorías/porción", `${Math.round(mix.carbsPerServing * 4)} kcal`],
-                    ] as [string, string][]).map(([k, v]) => (
-                      <div key={k} className="flex items-center justify-between py-3">
-                        <span className="text-xs uppercase tracking-widest text-ink-3">{k}</span>
-                        <span className="text-sm font-semibold text-ink" style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 space-y-2">
-                    {mix.reasoning.map(r => (
-                      <p key={r.field} className="text-xs text-ink-3 leading-relaxed">{r.explanation[locale]}</p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Flavor selector */}
-              <div className="mt-12">
-                <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">{isEn ? "Flavor" : "Sabor"}</p>
-                <div className="grid grid-cols-4 gap-3">
-                  {BRAND_FLAVORS.map(f => (
-                    <button key={f.key} onClick={() => { setFlavorKey(f.key); updateMix("flavor", f.key); }}
-                      className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-4 transition-all ${
-                        flavorKey === f.key ? "border-ink bg-ink text-bg" : "border-line text-ink-2 hover:border-ink-2"
-                      }`}>
-                      <div className="h-8 w-8 rounded-full ring-1 ring-black/10" style={{ background: f.color }} />
-                      <span className="text-xs font-medium">{isEn ? f.en : f.es}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-10 flex justify-end">
-                <Button onClick={() => setStage("refine")}>{isEn ? "Refine formula →" : "Perfeccionar →"}</Button>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STAGE: REFINE ───────────────────────────────────────────── */}
-          {stage === "refine" && mix && (
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">{isEn ? "Refine your formula" : "Perfecciona tu fórmula"}</h2>
-              <p className="mt-1 text-sm text-ink-3">{isEn ? "Adjust values and complete your athlete profile." : "Ajusta valores y completa tu perfil de atleta."}</p>
-
-              {/* Formula editor */}
-              <div className="mt-8 grid gap-5 sm:grid-cols-2">
-                <EF label={isEn ? "Carbs/serving" : "Carbos/porción"}>
-                  <SS value={mix.carbsPerServing} steps={[25,50,75,100,125,150] as const} suffix="g" onChange={v => updateMix("carbsPerServing", v as typeof mix.carbsPerServing)} />
-                </EF>
-                <EF label={isEn ? "Sodium/serving" : "Sodio/porción"}>
-                  <SS value={mix.sodiumPerServing} steps={[200,400,600,800,1000] as const} suffix="mg" onChange={v => updateMix("sodiumPerServing", v as typeof mix.sodiumPerServing)} />
-                </EF>
-                <EF label={isEn ? "Caffeine/serving" : "Cafeína/porción"}>
-                  <SS value={mix.caffeinePerServing} steps={[0,25,50,75,100] as const} suffix="mg" onChange={v => updateMix("caffeinePerServing", v as typeof mix.caffeinePerServing)} />
-                </EF>
-                <EF label={isEn ? "Ratio Malto:Fructose" : "Malto:Fructosa"}>
-                  <div className="flex gap-2">
-                    {(["1:0.8","2:1"] as const).map(r => (
-                      <button key={r} onClick={() => updateMix("ratio", r)}
-                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.ratio === r ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>{r}</button>
-                    ))}
-                  </div>
-                </EF>
-                <EF label={isEn ? "Flavor strength" : "Intensidad"}>
-                  <div className="flex gap-2">
-                    {(["lite","regular","mega"] as const).map(s => (
-                      <button key={s} onClick={() => updateMix("flavorStrength", s)}
-                        className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${mix.flavorStrength === s ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>{s}</button>
-                    ))}
-                  </div>
-                </EF>
-                <EF label={isEn ? "Flavor" : "Sabor"}>
-                  <div className="flex gap-2 flex-wrap">
-                    {BRAND_FLAVORS.map(f => (
-                      <button key={f.key} onClick={() => { setFlavorKey(f.key); updateMix("flavor", f.key); }}
-                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors ${flavorKey === f.key ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                        <span className="h-3 w-3 rounded-full" style={{ background: f.color }} />
-                        {isEn ? f.en : f.es}
-                      </button>
-                    ))}
-                  </div>
-                </EF>
-              </div>
-
-              {warnings.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {warnings.map(w => (
-                    <div key={w} className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink-2">⚠️ {editWarningCopy[w][locale]}</div>
-                  ))}
-                </div>
-              )}
-
-              {/* Athlete profile section */}
-              <div className="mt-10 pt-10 border-t border-line">
-                <p className="text-xs uppercase tracking-widest text-ink-3 mb-6">{isEn ? "Athlete profile" : "Perfil del atleta"}</p>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <EF label={isEn ? "Training hours/week" : "Horas/semana"}>
-                    <div className="flex flex-wrap gap-2">
-                      {[4,6,8,10,12,15].map(n => (
-                        <button key={n} onClick={() => updateAnswers("trainingHoursPerWeek", n)}
-                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${answers.trainingHoursPerWeek === n ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>{n}h</button>
-                      ))}
-                    </div>
-                  </EF>
-                  <EF label={isEn ? "Daily caffeine" : "Cafeína diaria"}>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(["none","occasional","daily","heavy"] as const).map(v => (
-                        <button key={v} onClick={() => updateAnswers("caffeineConsumption", v)}
-                          className={`rounded-lg border px-3 py-2 text-xs transition-colors ${answers.caffeineConsumption === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                          {isEn ? v : { none:"Nada", occasional:"Ocasional", daily:"Diario", heavy:"Mucho" }[v]}
-                        </button>
-                      ))}
-                    </div>
-                  </EF>
-                  <EF label={isEn ? "Sweat rate" : "Sudoración"}>
-                    <div className="flex gap-2">
-                      {(["low","medium","high"] as const).map(v => (
-                        <button key={v} onClick={() => updateAnswers("sweatRate", v)}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${answers.sweatRate === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                          {isEn ? v : { low:"Baja", medium:"Media", high:"Alta" }[v]}
-                        </button>
-                      ))}
-                    </div>
-                  </EF>
-                  <EF label={isEn ? "Hot climate training?" : "¿Clima caluroso?"}>
-                    <YNButtons value={answers.hotClimateTraining} isEn={isEn} onChange={v => updateAnswers("hotClimateTraining", v)} />
-                  </EF>
-                  <EF label={isEn ? "Cramping or sodium issues?" : "¿Calambres o sodio?"}>
-                    <YNButtons value={answers.sodiumIssues} isEn={isEn} onChange={v => updateAnswers("sodiumIssues", v)} />
-                  </EF>
-                  <EF label={isEn ? "Digestive issues?" : "¿Problemas digestivos?"}>
-                    <YNButtons value={answers.digestiveIssues} isEn={isEn} onChange={v => updateAnswers("digestiveIssues", v)} />
-                  </EF>
-                  {answers.digestiveIssues === "yes" && (
-                    <>
-                      <EF label={isEn ? "Issues with gels?" : "¿Problemas con geles?"}>
-                        <YNButtons value={answers.pastIssuesWithGels} isEn={isEn} onChange={v => updateAnswers("pastIssuesWithGels", v)} />
-                      </EF>
-                      <EF label={isEn ? "Issues with sports drinks?" : "¿Problemas con bebidas?"}>
-                        <YNButtons value={answers.pastIssuesWithSportsDrinks} isEn={isEn} onChange={v => updateAnswers("pastIssuesWithSportsDrinks", v)} />
-                      </EF>
-                    </>
-                  )}
-                  <EF label={isEn ? "Fructose tolerance" : "Tolerancia fructosa"}>
-                    <div className="flex gap-2">
-                      {(["low","normal","high"] as const).map(v => (
-                        <button key={v} onClick={() => updateAnswers("fructoseTolerance", v)}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${answers.fructoseTolerance === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                          {isEn ? v : { low:"Baja", normal:"Normal", high:"Alta" }[v]}
-                        </button>
-                      ))}
-                    </div>
-                  </EF>
-                  <EF label={isEn ? "Sugar sensitivity?" : "¿Sensibilidad azúcar?"}>
-                    <YNButtons value={answers.sugarSensitivity} isEn={isEn} onChange={v => updateAnswers("sugarSensitivity", v)} />
-                  </EF>
-                  <EF label={isEn ? "Diabetes?" : "¿Diabetes?"}>
-                    <YNButtons value={answers.diabetes} isEn={isEn} onChange={v => updateAnswers("diabetes", v)} />
-                  </EF>
-                  <EF label={isEn ? "Preferred sweetness" : "Dulzor preferido"}>
-                    <div className="flex gap-2">
-                      {(["light","regular","intense"] as const).map(v => (
-                        <button key={v} onClick={() => updateAnswers("preferredSweetness", v)}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-xs capitalize transition-colors ${answers.preferredSweetness === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                          {isEn ? v : { light:"Ligero", regular:"Regular", intense:"Intenso" }[v]}
-                        </button>
-                      ))}
-                    </div>
-                  </EF>
-                </div>
-              </div>
-
-              {/* Race context */}
-              <div className="mt-8 pt-8 border-t border-line">
-                <p className="text-xs uppercase tracking-widest text-ink-3 mb-6">{isEn ? "Race context" : "Contexto de carrera"}</p>
-                <div className="space-y-5">
-                  <EF label={isEn ? "This formula is for…" : "Esta fórmula es para…"}>
-                    <div className="flex gap-2">
-                      {(["race","training","both"] as const).map(v => (
-                        <button key={v} onClick={() => updateAnswers("goal", v)}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${answers.goal === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                          {isEn ? v : { race:"Carrera", training:"Entrenamiento", both:"Ambos" }[v]}
-                        </button>
-                      ))}
-                    </div>
-                  </EF>
-                  <EF label={isEn ? "Event name (optional)" : "Evento (opcional)"}>
-                    <input value={answers.eventName} onChange={e => updateAnswers("eventName", e.target.value)}
-                      placeholder={isEn ? "e.g. IRONMAN 70.3" : "Ej. IRONMAN 70.3"}
-                      className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none" />
-                  </EF>
-                  <EF label={isEn ? "Event date (optional)" : "Fecha del evento (opcional)"}>
-                    <input type="date" value={answers.eventDate} onChange={e => updateAnswers("eventDate", e.target.value)}
-                      className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink focus:border-ink focus:outline-none" />
-                  </EF>
-                  <EF label={isEn ? "Carbs target per hour (g)" : "Objetivo carbs/hora (g)"}>
-                    <div className="flex flex-wrap gap-2">
-                      {[30,45,60,75,90,120].map(n => (
-                        <button key={n} onClick={() => updateAnswers("carbTargetPerHour", n)}
-                          className={`rounded-lg border px-4 py-2 text-sm transition-colors ${answers.carbTargetPerHour === n ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>{n}g</button>
-                      ))}
-                    </div>
-                  </EF>
-                  <EF label={isEn ? "Caffeine purpose" : "Propósito de la cafeína"}>
-                    <div className="grid gap-2">
-                      {(["race_only","both","training_only"] as const).map(v => (
-                        <button key={v} onClick={() => updateAnswers("caffeineGoal", v)}
-                          className={`rounded-lg border px-4 py-2 text-xs text-left transition-colors ${answers.caffeineGoal === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                          {isEn
-                            ? { race_only:"Race only — one mix", both:"Training + Race — two mixes", training_only:"No caffeine" }[v]
-                            : { race_only:"Solo carrera — una mezcla", both:"Entrenamiento + Carrera — dos mezclas", training_only:"Sin cafeína" }[v]}
-                        </button>
-                      ))}
-                    </div>
-                  </EF>
-                </div>
-              </div>
-
-              <div className="mt-10 flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setStage("formula")}>{isEn ? "← Back" : "← Atrás"}</Button>
-                <Button onClick={goToQuantity}>{isEn ? "See quantity →" : "Ver cantidad →"}</Button>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STAGE: QUANTITY ─────────────────────────────────────────── */}
-          {stage === "quantity" && mix && (
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">{isEn ? "How much do you need?" : "¿Cuánto necesitas?"}</h2>
-
-              {answers.eventDate && (() => {
-                const weeks = Math.max(0, Math.ceil((new Date(answers.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)));
-                const suggested = Math.max(1, Math.ceil(weeks * (answers.trainingHoursPerWeek / 14)));
-                return (
-                  <div className="mt-4 rounded-xl border border-line bg-surface-2 px-4 py-3">
-                    <p className="text-xs text-ink-2">
-                      {isEn ? `${weeks} weeks to your event. Based on your training load, we suggest ~${suggested} bags.` : `${weeks} semanas para tu evento. Según tu carga de entrenamiento, sugerimos ~${suggested} bolsas.`}
-                    </p>
-                  </div>
-                );
-              })()}
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                {PRICE_OPTIONS.map(o => (
-                  <button key={o.qty} onClick={() => setQty(o.qty)}
-                    className={`rounded-2xl border p-5 text-left transition-all ${qty === o.qty ? "border-ink bg-ink text-bg" : "border-line hover:border-ink-2"}`}>
-                    <p className="text-xs uppercase tracking-widest mb-2" style={{ opacity: qty === o.qty ? 0.6 : 1 }}>
-                      {o.qty === 1 ? (isEn ? "Sample" : "Muestra") : o.qty === 3 ? (isEn ? "Monthly" : "Mensual") : (isEn ? "Quarterly" : "Trimestral")}
-                    </p>
-                    <p className="text-lg font-black" style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>
-                      {isEn ? `${o.qty} bag${o.qty > 1 ? "s" : ""}` : `${o.qty} bolsa${o.qty > 1 ? "s" : ""}`}
-                    </p>
-                    <p className="mt-1 text-sm">{o.servings} {isEn ? "servings" : "porciones"}</p>
-                    <p className="mt-3 text-xl font-semibold">${o.price}</p>
-                    {o.discount && <p className="mt-0.5 text-xs" style={{ opacity: 0.7 }}>{isEn ? `Save ${o.discount}` : `Ahorra ${o.discount}`}</p>}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-6 text-center text-xs text-ink-3">
-                ${(priceOption.price / priceOption.servings).toFixed(2)} / {isEn ? "serving" : "porción"} · {isEn ? "Free shipping" : "Envío gratis"}
-              </div>
-
-              <div className="mt-10 flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setStage("refine")}>{isEn ? "← Back" : "← Atrás"}</Button>
-                <Button onClick={() => setStage("order")}>{isEn ? "See my order →" : "Ver mi pedido →"}</Button>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STAGE: ORDER (Last order view) ─────────────────────────── */}
-          {stage === "order" && mix && (
-            <div>
-              {/* Big product bag + personalization */}
-              <div className="flex flex-col lg:flex-row gap-10 items-center lg:items-start">
-                <div className="shrink-0">
-                  <ProductBag flavor={flavor} isEn={isEn} large />
-                </div>
-                <div className="flex-1 text-center lg:text-left">
-                  <p className="text-xs uppercase tracking-[0.4em] text-ink-3">zenit nutrition</p>
-                  <h1 className="mt-3 text-3xl sm:text-5xl font-black uppercase tracking-tight text-ink"
-                    style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>
-                    {isEn ? "Personalized for" : "Personalizado para"}
-                  </h1>
-                  <h2 className="text-3xl sm:text-5xl font-black uppercase text-ink"
-                    style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>
-                    {firstName.toUpperCase()}
-                  </h2>
-                  <p className="mt-5 text-ink-2 italic leading-relaxed max-w-sm">{mix.motivationalMessage[locale]}</p>
-                  {answers.eventName && (
-                    <p className="mt-3 text-sm text-ink-3">
-                      {isEn ? "For:" : "Para:"} <span className="font-medium text-ink">{answers.eventName}</span>
-                      {answers.eventDate && ` · ${new Date(answers.eventDate).toLocaleDateString(isEn ? "en-US" : "es")}`}
-                    </p>
-                  )}
-                  <div className="mt-5 inline-flex flex-col gap-1 text-left">
-                    {[`${mix.carbsPerServing}g carbs`, `${mix.sodiumPerServing}mg sodium`, `${mix.caffeinePerServing}mg caffeine`, isEn ? flavor.en : flavor.es].map(t => (
-                      <span key={t} className="text-xs text-ink-3">· {t}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Race Pack offer */}
-              <div className="mt-10 rounded-2xl border border-line bg-surface p-6">
-                <div className="flex items-start gap-4">
-                  <button
-                    onClick={() => setRacePack(r => !r)}
-                    className={`mt-0.5 h-5 w-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
-                      racePack ? "border-ink bg-ink" : "border-line"
-                    }`}
-                  >
-                    {racePack && <svg viewBox="0 0 10 8" fill="none" className="h-3 w-3"><polyline points="1,4 4,7 9,1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                  </button>
-                  <div>
-                    <p className="font-semibold text-ink">
-                      {isEn ? "Add Race Pack" : "Agregar Race Pack"} · <span style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>${RACE_PACK_PRICE}</span>
-                    </p>
-                    <p className="mt-1 text-sm text-ink-3">
-                      {isEn
-                        ? "6 single-serve sachets tuned for race day intensity. Easy to carry, no scooping."
-                        : "6 sobres individuales optimizados para la intensidad del día de carrera. Fáciles de llevar, sin cucharas."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Price total */}
-              <div className="mt-6 rounded-2xl border border-line bg-surface p-6">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-ink-2">{qty} {isEn ? `bag${qty > 1 ? "s" : ""}` : `bolsa${qty > 1 ? "s" : ""}`} · {priceOption.servings} {isEn ? "servings" : "porciones"}</span>
-                    <span className="text-ink">${priceOption.price}</span>
-                  </div>
-                  {racePack && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-ink-2">Race Pack · 6 sachets</span>
-                      <span className="text-ink">${RACE_PACK_PRICE}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm text-ink-3">
-                    <span>{isEn ? "Shipping" : "Envío"}</span>
-                    <span>{isEn ? "Free" : "Gratis"}</span>
-                  </div>
-                  <div className="pt-3 border-t border-line flex justify-between">
-                    <span className="font-semibold text-ink">{isEn ? "Total" : "Total"}</span>
-                    <span className="text-xl font-black text-ink" style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)" }}>${total}</span>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  {ordered ? (
-                    <div className="rounded-xl border border-line bg-surface-2 px-5 py-4 text-center">
-                      <p className="font-semibold text-ink">{isEn ? "Order received!" : "¡Pedido recibido!"}</p>
-                      <p className="mt-1 text-sm text-ink-3">{isEn ? "We’ll be in touch at" : "Te contactaremos en"} {answers.email}</p>
-                    </div>
-                  ) : (
-                    <Link href="/checkout">
-                      <Button className="w-full">
-                        {isEn ? `Pay $${total} →` : `Pagar $${total} →`}
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setStage("quantity")}>{isEn ? "← Back" : "← Atrás"}</Button>
-                <Link href="/perfil" className="text-xs text-ink-3 underline underline-offset-4 hover:text-ink-2">
-                  {isEn ? "View my profile" : "Ver mi perfil"}
-                </Link>
-              </div>
-            </div>
-          )}
-
+    <div style={{ width: size, margin: "0 auto" }}>
+      <div style={{
+        width: size, height: size * 1.4,
+        background: "linear-gradient(160deg, #c8c8c8 0%, #f0f0f0 40%, #b0b0b0 100%)",
+        borderRadius: mini ? 12 : 20,
+        display: "flex", flexDirection: "column",
+        overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+        position: "relative",
+      }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: mini ? 14 : 22, letterSpacing: 2, color: "#333" }}>
+            zenit
+          </span>
         </div>
-      </main>
-    </div>
-  );
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function ProductBag({ flavor, isEn, large }: { flavor: { en: string; es: string; color: string }; isEn: boolean; large?: boolean }) {
-  const w = large ? 240 : 200;
-  const h = large ? 360 : 300;
-  return (
-    <div className="relative mx-auto lg:mx-0" style={{ width: w, height: h }}>
-      <div className="absolute inset-0 rounded-3xl overflow-hidden"
-        style={{
-          background: "linear-gradient(160deg, #D0D0CE 0%, #EAEAE8 30%, #C0C0BE 60%, #DCDCDA 100%)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.6)",
-        }}>
-        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,transparent 30%,rgba(255,255,255,0.35) 47%,transparent 55%)" }} />
-        <div className="relative flex flex-col items-center h-full pb-28 px-6 pt-9">
-          <svg width="26" height="22" viewBox="0 0 26 22" fill="none">
-            <polyline points="13,2 24,20 2,20" stroke="#0B0B0C" strokeWidth="1.5" strokeLinejoin="round" />
-            <circle cx="13" cy="2" r="2.5" fill="#0B0B0C" />
-          </svg>
-          <p className="mt-2 text-2xl font-black text-[#0B0B0C]" style={{ fontFamily: "JetBrains Mono,monospace", letterSpacing: "0.03em" }}>zenit</p>
-          <p className="text-[7px] uppercase tracking-[0.5em] text-[#55565B] mt-0.5">nutrition</p>
-          <div className="mt-5 w-full border-t border-[#0B0B0C]/20" />
-          <p className="mt-5 text-sm font-bold uppercase tracking-[0.2em] text-[#0B0B0C]">{isEn ? flavor.en : flavor.es}</p>
-          <p className="mt-1 text-[9px] uppercase tracking-widest text-[#55565B]">33 g · 14 servings</p>
-          <p className="mt-0.5 text-[9px] uppercase tracking-widest text-[#55565B]">120 kcal · 30 g carbs</p>
-        </div>
-        <div className="absolute bottom-0 inset-x-0 rounded-b-3xl flex items-center justify-center" style={{ height: large ? 112 : 96, background: flavor.color }}>
-          <p className="text-xs font-bold uppercase tracking-widest text-white/95">{isEn ? flavor.en : flavor.es}</p>
+        {mix && !mini && (
+          <div style={{ padding: "4px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#555", fontFamily: "var(--font-mono)" }}>
+              {mix.carbsPerServing}g carbs · {mix.sodiumPerServing}mg Na
+              {mix.caffeinePerServing > 0 ? ` · ${mix.caffeinePerServing}mg caff` : ""}
+            </div>
+          </div>
+        )}
+        <div style={{ height: mini ? 28 : 48, background: f.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: mini ? 9 : 13, color: "#fff", letterSpacing: 1 }}>
+            {f.en.toUpperCase()}
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-function EF({ label, children }: { label: string; children: React.ReactNode }) {
+function EF({ label, value, onDec, onInc, warn }: {
+  label: string; value: string | number; onDec: () => void; onInc: () => void; warn?: boolean;
+}) {
   return (
-    <div>
-      <label className="mb-2 block text-xs uppercase tracking-widest text-ink-3">{label}</label>
-      {children}
+    <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--line)" }}>
+      <span className="text-sm" style={{ color: warn ? "#C41C00" : "var(--ink-2)" }}>{label}</span>
+      <div className="flex items-center gap-2">
+        <button onClick={onDec} className="w-6 h-6 rounded flex items-center justify-center text-sm" style={{ background: "var(--surface-2)" }}>−</button>
+        <span className="text-sm font-mono w-16 text-center" style={{ color: warn ? "#C41C00" : "var(--ink)" }}>{value}</span>
+        <button onClick={onInc} className="w-6 h-6 rounded flex items-center justify-center text-sm" style={{ background: "var(--surface-2)" }}>+</button>
+      </div>
     </div>
   );
 }
 
-function SS<T extends number>({ value, steps, suffix, onChange }: { value: T; steps: readonly T[]; suffix: string; onChange: (v: T) => void }) {
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
+export default function MixPage() {
+  const { locale } = useLocale();
+  const router = useRouter();
+  const isEn = locale === "en";
+
+  const [stage, setStage] = useState<Stage>("formula");
+  const [answers, setAnswers] = useState<AssessmentAnswers>(DEFAULT_ANSWERS);
+  const [mix, setMix] = useState<CustomMix | null>(null);
+  const [flavorKey, setFlavorKey] = useState("peach");
+  const [qty, setQty] = useState(3);
+  const [racePack, setRacePack] = useState(false);
+  const [ordered, setOrdered] = useState(false);
+  const [lastEdit, setLastEdit] = useState<{ field: string; value: unknown } | null>(null);
+  const [suggestedMix, setSuggestedMix] = useState<CustomMix | null>(null);
+
+  useEffect(() => {
+    try {
+      const u = sessionStorage.getItem("zenit:user");
+      if (u) {
+        const parsed = JSON.parse(u);
+        setAnswers(p => ({ ...p, ...parsed }));
+      }
+      const f = sessionStorage.getItem("zenit:flavor");
+      if (f && BRAND_FLAVORS.find(x => x.key === f)) setFlavorKey(f);
+
+      const a = sessionStorage.getItem("carbyn:answers");
+      const m = sessionStorage.getItem("carbyn:mix");
+      if (a && m) {
+        const parsedAnswers = JSON.parse(a) as AssessmentAnswers;
+        setAnswers(parsedAnswers);
+        const parsedMix = JSON.parse(m) as CustomMix;
+        setMix(parsedMix);
+        if (parsedMix.flavor) {
+          const fk = BRAND_FLAVORS.find(x => x.en.toLowerCase() === parsedMix.flavor.toLowerCase() || x.es.toLowerCase() === parsedMix.flavor.toLowerCase());
+          if (fk) setFlavorKey(fk.key);
+        }
+      } else {
+        router.replace("/assessment");
+      }
+    } catch { /* ignore */ }
+  }, [router]);
+
+  const checkRecalc = useCallback((newAnswers: AssessmentAnswers) => {
+    if (!mix) return;
+    try {
+      const newRec = buildRecommendation(newAnswers);
+      const changed = (
+        newRec.carbsPerServing !== mix.carbsPerServing ||
+        newRec.sodiumPerServing !== mix.sodiumPerServing ||
+        newRec.caffeinePerServing !== mix.caffeinePerServing
+      );
+      if (changed) {
+        const newMix = assembleCustomMix(newAnswers);
+        setSuggestedMix(newMix);
+      } else {
+        setSuggestedMix(null);
+      }
+    } catch { /* ignore */ }
+  }, [mix]);
+
+  function updateRefineAnswer<K extends keyof AssessmentAnswers>(key: K, val: AssessmentAnswers[K]) {
+    const updated = { ...answers, [key]: val };
+    setAnswers(updated);
+    checkRecalc(updated);
+  }
+
+  function editMixField(field: keyof FormulaRecommendation, delta: number) {
+    if (!mix) return;
+    const steps: Record<string, number[]> = {
+      carbsPerServing:  [25, 50, 75, 100, 125, 150],
+      sodiumPerServing: [200, 400, 600, 800, 1000],
+      caffeinePerServing: [0, 25, 50, 75, 100],
+    };
+    const arr = steps[field as string];
+    if (!arr) return;
+    const cur = mix[field] as number;
+    const idx = arr.indexOf(cur);
+    const next = arr[Math.max(0, Math.min(arr.length - 1, idx + delta))];
+    const updated = { ...mix, [field]: next };
+    updated.warnings = getEditWarnings(buildRecommendation(answers), updated);
+    setMix(updated);
+    setLastEdit({ field: field as string, value: next });
+    sessionStorage.setItem("carbyn:mix", JSON.stringify(updated));
+  }
+
+  const eventDate = answers.eventDate ? new Date(answers.eventDate) : null;
+  const today = new Date();
+  const daysToEvent = eventDate ? Math.max(0, Math.floor((eventDate.getTime() - today.getTime()) / 86400000)) : 56;
+  const weeksRemaining = Math.max(4, Math.round(daysToEvent / 7));
+  const fueledPerWeek = Math.min(6, Math.max(2, Math.round((answers.trainingHoursPerWeek ?? 8) / 2)));
+  const scoopTotal = fueledPerWeek * weeksRemaining;
+  const servingsTotal = Math.ceil(scoopTotal / 2);
+  const recommendedTier = PRICE_OPTIONS.reduce((best, opt) => opt.servings >= servingsTotal && opt.servings < (best?.servings ?? 9999) ? opt : best, PRICE_OPTIONS[PRICE_OPTIONS.length - 1]);
+
+  const priceOpt = PRICE_OPTIONS.find(p => p.qty === qty) ?? PRICE_OPTIONS[1];
+  const total = priceOpt.price + (racePack ? RACE_PACK_PRICE : 0);
+
+  function goCheckout() {
+    if (!mix) return;
+    const payload = { ...mix, qty, racePack, totalPrice: total, flavorKey };
+    sessionStorage.setItem("carbyn:mix", JSON.stringify(payload));
+    router.push("/checkout");
+  }
+
+  const STAGES: Stage[] = ["formula", "refine", "quantity", "order"];
+  const stageIdx = STAGES.indexOf(stage);
+
+  if (!mix) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
+        <p style={{ color: "var(--ink-3)" }}>{isEn ? "Loading your formula…" : "Cargando tu fórmula…"}</p>
+      </div>
+    );
+  }
+
+  if (stage === "formula") {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+        <SiteHeader />
+        <StageNav stages={STAGES} current={stage} setStage={setStage} isEn={isEn} />
+        <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
+          <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">{isEn ? "Your Formula" : "Tu Fórmula"}</h1>
+              <p className="text-sm mb-6" style={{ color: "var(--ink-3)" }}>
+                {isEn ? "Built from your answers. Review your formula below." : "Construida a partir de tus respuestas. Revisa tu fórmula abajo."}
+              </p>
+              <div className="flex justify-center mb-8">
+                <ProductBag flavor={flavorKey} mix={mix} />
+              </div>
+              <div className="mb-6">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--ink-3)" }}>
+                  {isEn ? "Flavor" : "Sabor"}
+                </p>
+                <div className="flex gap-3">
+                  {BRAND_FLAVORS.map(f => (
+                    <button
+                      key={f.key}
+                      onClick={() => setFlavorKey(f.key)}
+                      className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                      style={{
+                        background: f.color + "22",
+                        border: `2px solid ${flavorKey === f.key ? f.color : "transparent"}`,
+                        color: "var(--ink)",
+                      }}
+                    >
+                      {isEn ? f.en : f.es}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl p-6 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--ink-3)" }}>
+                  {isEn ? "Formula per Serving" : "Fórmula por Porción"}
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { label: isEn ? "Carbs" : "Carbohidratos", value: `${mix.carbsPerServing}g` },
+                    { label: isEn ? "Sodium" : "Sodio", value: `${mix.sodiumPerServing}mg` },
+                    { label: isEn ? "Caffeine" : "Cafeína", value: `${mix.caffeinePerServing}mg` },
+                    { label: isEn ? "Ratio" : "Proporción", value: mix.ratio },
+                    { label: isEn ? "Sweetness" : "Dulzura", value: mix.flavorStrength },
+                  ].map(r => (
+                    <div key={r.label} className="flex flex-col">
+                      <span className="text-xs" style={{ color: "var(--ink-3)" }}>{r.label}</span>
+                      <span className="text-lg font-bold" style={{ fontFamily: "var(--font-mono)" }}>{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {mix.reasoning.length > 0 && (
+                <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--ink-3)" }}>
+                    {isEn ? "Why these values" : "Por qué estos valores"}
+                  </p>
+                  {mix.reasoning.map((r, i) => (
+                    <p key={i} className="text-sm mb-2" style={{ color: "var(--ink-2)" }}>
+                      • {r.explanation[locale as "en" | "es"]}
+                    </p>
+                  ))}
+                </div>
+              )}
+              <Button className="w-full" onClick={() => setStage("refine")}>
+                {isEn ? "Refine your formula →" : "Perfeccionar →"}
+              </Button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <AiPanel stage="formula" mix={mix} answers={answers} lastEdit={lastEdit} locale={locale as "en" | "es"} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === "refine") {
+    const warnings = mix.warnings ?? [];
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+        <SiteHeader />
+        <StageNav stages={STAGES} current={stage} setStage={setStage} isEn={isEn} />
+        <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
+          {suggestedMix && (
+            <div className="mb-6 rounded-xl px-4 py-3 flex items-center justify-between gap-4" style={{ background: "#E8946A22", border: "1px solid #E8946A" }}>
+              <p className="text-sm" style={{ color: "var(--ink)" }}>
+                {isEn ? "Your profile update suggests new formula values." : "Tu perfil actualizado sugiere nuevos valores de fórmula."}
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <Button variant="secondary" onClick={() => { setMix(suggestedMix); setSuggestedMix(null); }}>
+                  {isEn ? "Use suggested" : "Usar sugeridos"}
+                </Button>
+                <Button variant="ghost" onClick={() => setSuggestedMix(null)}>
+                  {isEn ? "Keep mine" : "Mantener"}
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">{isEn ? "Refine" : "Perfeccionar"}</h1>
+              <p className="text-sm mb-6" style={{ color: "var(--ink-3)" }}>
+                {isEn ? "Adjust individual values if needed." : "Ajusta valores individuales si lo necesitas."}
+              </p>
+              <div className="rounded-2xl p-6 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                <EF
+                  label={`${isEn ? "Carbs" : "Carbos"} (g)`}
+                  value={`${mix.carbsPerServing}g`}
+                  warn={warnings.includes("carbs")}
+                  onDec={() => editMixField("carbsPerServing", -1)}
+                  onInc={() => editMixField("carbsPerServing", 1)}
+                />
+                <EF
+                  label={`${isEn ? "Sodium" : "Sodio"} (mg)`}
+                  value={`${mix.sodiumPerServing}mg`}
+                  warn={warnings.includes("sodium")}
+                  onDec={() => editMixField("sodiumPerServing", -1)}
+                  onInc={() => editMixField("sodiumPerServing", 1)}
+                />
+                <EF
+                  label={`${isEn ? "Caffeine" : "Cafeína"} (mg)`}
+                  value={`${mix.caffeinePerServing}mg`}
+                  warn={warnings.includes("caffeine")}
+                  onDec={() => editMixField("caffeinePerServing", -1)}
+                  onInc={() => editMixField("caffeinePerServing", 1)}
+                />
+                {warnings.length > 0 && (
+                  <div className="mt-4 p-3 rounded-lg" style={{ background: "#C41C0011", border: "1px solid #C41C0044" }}>
+                    {warnings.map(w => (
+                      <p key={w} className="text-xs" style={{ color: "#C41C00" }}>
+                        ⚠ {editWarningCopy[w]?.[locale as "en" | "es"]}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button className="w-full" onClick={() => setStage("quantity")}>
+                {isEn ? "Calculate quantity →" : "Calcular cantidad →"}
+              </Button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--ink-3)" }}>
+                  {isEn ? "Athlete Profile" : "Tu Perfil"}
+                </p>
+                <p className="text-xs font-semibold mb-2" style={{ color: "var(--ink-2)" }}>ATLETA</p>
+                <ProfileField label={isEn ? "Caffeine consumption" : "Consumo de cafeína"} value={answers.caffeineConsumption}
+                  options={["none","occasional","daily","heavy"]}
+                  onChange={v => updateRefineAnswer("caffeineConsumption", v as AssessmentAnswers["caffeineConsumption"])} />
+                <ProfileField label={isEn ? "Sweat rate" : "Tasa de sudoración"} value={answers.sweatRate}
+                  options={["low","medium","high"]}
+                  onChange={v => updateRefineAnswer("sweatRate", v as AssessmentAnswers["sweatRate"])} />
+                <ProfileField label={isEn ? "Hot climate" : "Clima caluroso"} value={answers.hotClimateTraining}
+                  options={["yes","no"]}
+                  onChange={v => updateRefineAnswer("hotClimateTraining", v as AssessmentAnswers["hotClimateTraining"])} />
+                <ProfileField label={isEn ? "Sodium/cramping issues" : "Sodio/calambres"} value={answers.sodiumIssues}
+                  options={["yes","no"]}
+                  onChange={v => updateRefineAnswer("sodiumIssues", v as AssessmentAnswers["sodiumIssues"])} />
+                <ProfileField label={isEn ? "Digestive issues" : "Problemas digestivos"} value={answers.digestiveIssues}
+                  options={["yes","no"]}
+                  onChange={v => updateRefineAnswer("digestiveIssues", v as AssessmentAnswers["digestiveIssues"])} />
+                {answers.digestiveIssues === "yes" && <>
+                  <ProfileField label={isEn ? "Issues with gels" : "Problemas con geles"} value={answers.pastIssuesWithGels}
+                    options={["yes","no"]}
+                    onChange={v => updateRefineAnswer("pastIssuesWithGels", v as AssessmentAnswers["pastIssuesWithGels"])} />
+                  <ProfileField label={isEn ? "Issues with drinks" : "Problemas con bebidas"} value={answers.pastIssuesWithSportsDrinks}
+                    options={["yes","no"]}
+                    onChange={v => updateRefineAnswer("pastIssuesWithSportsDrinks", v as AssessmentAnswers["pastIssuesWithSportsDrinks"])} />
+                </> }
+                <ProfileField label={isEn ? "Fructose tolerance" : "Tolerancia a fructosa"} value={answers.fructoseTolerance}
+                  options={["low","normal","high"]}
+                  onChange={v => updateRefineAnswer("fructoseTolerance", v as AssessmentAnswers["fructoseTolerance"])} />
+                <ProfileField label={isEn ? "Sugar sensitivity" : "Sensibilidad al azúcar"} value={answers.sugarSensitivity}
+                  options={["yes","no"]}
+                  onChange={v => updateRefineAnswer("sugarSensitivity", v as AssessmentAnswers["sugarSensitivity"])} />
+                <ProfileField label={isEn ? "Sweetness preference" : "Preferencia de dulzura"} value={answers.preferredSweetness}
+                  options={["light","regular","intense"]}
+                  onChange={v => updateRefineAnswer("preferredSweetness", v as AssessmentAnswers["preferredSweetness"])} />
+                <p className="text-xs font-semibold mt-4 mb-2" style={{ color: "var(--ink-2)" }}>META</p>
+                <div className="mb-2">
+                  <label className="text-xs" style={{ color: "var(--ink-3)" }}>{isEn ? "Event name" : "Nombre del evento"}</label>
+                  <input
+                    className="w-full mt-1 px-2 py-1 rounded text-sm"
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
+                    value={answers.eventName}
+                    onChange={e => updateRefineAnswer("eventName", e.target.value)}
+                    placeholder={isEn ? "e.g. Boston Marathon" : "ej. Maratón de Boston"}
+                  />
+                </div>
+                <div className="mb-2">
+                  <label className="text-xs" style={{ color: "var(--ink-3)" }}>{isEn ? "Event date" : "Fecha del evento"}</label>
+                  <input
+                    type="date"
+                    className="w-full mt-1 px-2 py-1 rounded text-sm"
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
+                    value={answers.eventDate}
+                    onChange={e => updateRefineAnswer("eventDate", e.target.value)}
+                  />
+                </div>
+                <ProfileField label={isEn ? "Caffeine goal" : "Objetivo de cafeína"} value={answers.caffeineGoal}
+                  options={["training_only","race_only","both"]}
+                  onChange={v => updateRefineAnswer("caffeineGoal", v as AssessmentAnswers["caffeineGoal"])} />
+              </div>
+              <AiPanel stage="refine" mix={mix} answers={answers} lastEdit={lastEdit} locale={locale as "en" | "es"} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === "quantity") {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+        <SiteHeader />
+        <StageNav stages={STAGES} current={stage} setStage={setStage} isEn={isEn} />
+        <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
+          <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">{isEn ? "How Much Do You Need?" : "¿Cuánto Necesitas?"}</h1>
+              <p className="text-sm mb-6" style={{ color: "var(--ink-3)" }}>
+                {isEn ? "Based on your training load and event date." : "Basado en tu carga de entrenamiento y fecha del evento."}
+              </p>
+              <div className="rounded-2xl p-6 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--ink-3)" }}>
+                  {isEn ? "Recommended Supply" : "Suministro Recomendado"}
+                </p>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <div className="text-2xl font-bold" style={{ fontFamily: "var(--font-mono)" }}>{weeksRemaining}</div>
+                    <div className="text-xs" style={{ color: "var(--ink-3)" }}>{isEn ? "weeks to event" : "semanas al evento"}</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold" style={{ fontFamily: "var(--font-mono)" }}>{fueledPerWeek}×</div>
+                    <div className="text-xs" style={{ color: "var(--ink-3)" }}>{isEn ? "fueled sessions/week" : "sesiones/semana"}</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold" style={{ fontFamily: "var(--font-mono)" }}>{scoopTotal}</div>
+                    <div className="text-xs" style={{ color: "var(--ink-3)" }}>{isEn ? "total scoops" : "scoops en total"}</div>
+                  </div>
+                </div>
+                <div className="text-sm p-3 rounded-lg" style={{ background: "var(--surface-2)" }}>
+                  {isEn
+                    ? `${servingsTotal} servings recommended to fuel your training through ${answers.eventName || "your event"}.`
+                    : `${servingsTotal} porciones recomendadas para fueling hasta ${answers.eventName || "tu evento"}.`}
+                </div>
+              </div>
+              <div className="rounded-2xl p-6 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--ink-3)" }}>
+                  {isEn ? "Scoop Plan" : "Plan de Scoops"}
+                </p>
+                <div className="text-sm" style={{ color: "var(--ink-2)" }}>
+                  <p>• {isEn ? `${fueledPerWeek} fueled sessions × ${weeksRemaining} weeks = ${scoopTotal} scoops` : `${fueledPerWeek} sesiones con combustible × ${weeksRemaining} semanas = ${scoopTotal} scoops`}</p>
+                  <p className="mt-1">• {isEn ? `${mix.carbsPerServing}g carbs per serving` : `${mix.carbsPerServing}g carbos por porción`}</p>
+                  <p className="mt-1">• {isEn ? "Use 1-2 scoops per session depending on duration" : "Usa 1-2 scoops por sesión según la duración"}</p>
+                </div>
+              </div>
+              <div className="grid gap-3 mb-6">
+                {PRICE_OPTIONS.map(opt => {
+                  const isRec = opt.qty === recommendedTier.qty;
+                  const isSel = qty === opt.qty;
+                  return (
+                    <button
+                      key={opt.qty}
+                      onClick={() => setQty(opt.qty)}
+                      className="text-left p-4 rounded-xl transition-all"
+                      style={{
+                        background: isSel ? "var(--ink)" : "var(--surface)",
+                        border: `2px solid ${isSel ? "var(--ink)" : isRec ? "#E8946A" : "var(--line)"}`,
+                        color: isSel ? "var(--bg)" : "var(--ink)",
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold">{opt.qty} {opt.qty === 1 ? (isEn ? "bag" : "bolsa") : (isEn ? "bags" : "bolsas")}</div>
+                          <div className="text-sm opacity-70">{opt.servings} {isEn ? "servings" : "porciones"}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold">${opt.price}</div>
+                          {opt.discount && <div className="text-xs" style={{ color: isSel ? "rgba(255,255,255,0.7)" : "#6BAF5E" }}>−{opt.discount}</div>}
+                          {isRec && !isSel && <div className="text-xs" style={{ color: "#E8946A" }}>✓ {isEn ? "Recommended" : "Recomendado"}</div>}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button className="w-full" onClick={() => setStage("order")}>
+                {isEn ? "Review order →" : "Revisar pedido →"}
+              </Button>
+            </div>
+            <div>
+              <AiPanel stage="quantity" mix={mix} answers={answers} lastEdit={lastEdit} locale={locale as "en" | "es"} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const priceOpt2 = PRICE_OPTIONS.find(p => p.qty === qty) ?? PRICE_OPTIONS[1];
+  const orderTotal = priceOpt2.price + (racePack ? RACE_PACK_PRICE : 0);
+
+  if (ordered) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+        <div className="text-6xl mb-6">✓</div>
+        <h2 className="text-2xl font-bold mb-2">{isEn ? "Order placed!" : "¡Pedido realizado!"}</h2>
+        <p className="text-center mb-8" style={{ color: "var(--ink-3)" }}>
+          {isEn ? "We'll send your custom mix within 3-5 business days." : "Te enviaremos tu mezcla personalizada en 3-5 días hábiles."}
+        </p>
+        <Link href="/perfil"><Button>{isEn ? "View profile" : "Ver perfil"}</Button></Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {steps.map(s => (
-        <button key={s} onClick={() => onChange(s)}
-          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${value === s ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-          {s}{suffix}
-        </button>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+      <SiteHeader />
+      <StageNav stages={STAGES} current={stage} setStage={setStage} isEn={isEn} />
+      <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+          <div>
+            <h1 className="text-2xl font-bold mb-6">{isEn ? "Your Order" : "Tu Pedido"}</h1>
+            <div className="flex justify-center mb-8">
+              <ProductBag flavor={flavorKey} mix={mix} />
+            </div>
+            <div className="rounded-2xl p-6 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--ink-3)" }}>
+                {isEn ? "Personalization" : "Personalización"}
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span style={{ color: "var(--ink-3)" }}>{isEn ? "Name on bag" : "Nombre en bolsa"}</span>
+                  <div className="font-medium mt-1">{mix.athleteName || answers.name || "—"}</div>
+                </div>
+                <div>
+                  <span style={{ color: "var(--ink-3)" }}>{isEn ? "Flavor" : "Sabor"}</span>
+                  <div className="font-medium mt-1">{BRAND_FLAVORS.find(f => f.key === flavorKey)?.[isEn ? "en" : "es"] ?? flavorKey}</div>
+                </div>
+                <div className="col-span-2">
+                  <span style={{ color: "var(--ink-3)" }}>{isEn ? "Formula" : "Fórmula"}</span>
+                  <div className="font-medium mt-1" style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                    {mix.carbsPerServing}g C · {mix.sodiumPerServing}mg Na · {mix.caffeinePerServing}mg Caff
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              className="rounded-2xl p-4 mb-6 flex items-center justify-between cursor-pointer"
+              style={{ background: "var(--surface)", border: `2px solid ${racePack ? "#E8946A" : "var(--line)"}` }}
+              onClick={() => setRacePack(r => !r)}
+            >
+              <div>
+                <div className="font-semibold text-sm">{isEn ? "Race Day Pack" : "Pack Día de Carrera"} +${RACE_PACK_PRICE}</div>
+                <div className="text-xs mt-1" style={{ color: "var(--ink-3)" }}>
+                  {isEn ? "Includes 4 single-serve sachets + gel belt" : "Incluye 4 sobres monodosis + cinturón de geles"}
+                </div>
+              </div>
+              <div className="w-5 h-5 rounded border-2 flex items-center justify-center" style={{ borderColor: racePack ? "#E8946A" : "var(--line)", background: racePack ? "#E8946A" : "transparent" }}>
+                {racePack && <span className="text-white text-xs">✓</span>}
+              </div>
+            </div>
+            <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+              <div className="flex justify-between text-sm mb-2">
+                <span style={{ color: "var(--ink-3)" }}>{qty} {isEn ? "bags" : "bolsas"} × ${priceOpt2.price / qty}</span>
+                <span>${priceOpt2.price}</span>
+              </div>
+              {racePack && (
+                <div className="flex justify-between text-sm mb-2">
+                  <span style={{ color: "var(--ink-3)" }}>{isEn ? "Race Day Pack" : "Pack Carrera"}</span>
+                  <span>${RACE_PACK_PRICE}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold pt-2" style={{ borderTop: "1px solid var(--line)" }}>
+                <span>Total</span>
+                <span>${orderTotal}</span>
+              </div>
+            </div>
+            <Button className="w-full" onClick={goCheckout}>
+              {isEn ? "Proceed to checkout →" : "Continuar al pago →"}
+            </Button>
+          </div>
+          <div>
+            <AiPanel stage="order" mix={mix} answers={answers} lastEdit={lastEdit} locale={locale as "en" | "es"} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StageNav({ stages, current, setStage, isEn }: {
+  stages: Stage[];
+  current: Stage;
+  setStage: (s: Stage) => void;
+  isEn: boolean;
+}) {
+  const labels: Record<Stage, { en: string; es: string }> = {
+    formula:  { en: "Formula",  es: "Fórmula" },
+    refine:   { en: "Refine",   es: "Perfeccionar" },
+    quantity: { en: "Quantity", es: "Cantidad" },
+    order:    { en: "Order",    es: "Pedido" },
+  };
+  const idx = stages.indexOf(current);
+  return (
+    <div className="flex items-center justify-center gap-0 py-4 px-4" style={{ borderBottom: "1px solid var(--line)" }}>
+      {stages.map((s, i) => (
+        <div key={s} className="flex items-center">
+          <button
+            onClick={() => i <= idx && setStage(s)}
+            className="text-xs px-3 py-1 rounded-full transition-all"
+            style={{
+              background: s === current ? "var(--ink)" : "transparent",
+              color: s === current ? "var(--bg)" : i < idx ? "var(--ink-2)" : "var(--ink-3)",
+              cursor: i <= idx ? "pointer" : "default",
+              fontWeight: s === current ? 600 : 400,
+            }}
+          >
+            {i + 1}. {isEn ? labels[s].en : labels[s].es}
+          </button>
+          {i < stages.length - 1 && <span style={{ color: "var(--line-strong)", margin: "0 2px" }}>›</span>}
+        </div>
       ))}
     </div>
   );
 }
 
-function YNButtons({ value, isEn, onChange }: { value: string; isEn: boolean; onChange: (v: "yes" | "no") => void }) {
+function ProfileField({ label, value, options, onChange }: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
   return (
-    <div className="flex gap-2">
-      {(["yes","no"] as const).map(v => (
-        <button key={v} onClick={() => onChange(v)}
-          className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${value === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-          {v === "yes" ? (isEn ? "Yes" : "Sí") : (isEn ? "No" : "No")}
-        </button>
-      ))}
+    <div className="mb-3">
+      <label className="text-xs block mb-1" style={{ color: "var(--ink-3)" }}>{label}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full text-xs px-2 py-1 rounded"
+        style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
     </div>
   );
 }
