@@ -40,7 +40,7 @@ const DEFAULT_ANSWERS: AssessmentAnswers = {
   pastIssuesWithGels: "no", pastIssuesWithSportsDrinks: "no",
 };
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── Sub-components ────────────────────────────────────────────
 
 function ProductBag({ flavor, mix, mini = false }: { flavor: string; mix: CustomMix | null; mini?: boolean }) {
   const f = BRAND_FLAVORS.find(x => x.key === flavor) ?? BRAND_FLAVORS[0];
@@ -78,6 +78,127 @@ function ProductBag({ flavor, mix, mini = false }: { flavor: string; mix: Custom
   );
 }
 
+// FlipBag — 3D flip showing nutrition panel on back, used in Refine stage
+function FlipBag({ flavor, mix, isEn }: { flavor: string; mix: CustomMix | null; isEn: boolean }) {
+  const [flipped, setFlipped] = useState(false);
+  const f = BRAND_FLAVORS.find(x => x.key === flavor) ?? BRAND_FLAVORS[0];
+
+  const darkShade: Record<string, string> = {
+    peach: "#A9331A", kiwi: "#4C7A1F", pineapple: "#C89013", mango: "#B23A17",
+  };
+  const c1 = darkShade[flavor] ?? "#333";
+  const c2 = f.color;
+  const mono = "'JetBrains Mono', monospace";
+
+  const nutRows = mix ? [
+    [isEn ? "Carbs" : "Carbohidratos", `${mix.carbsPerServing} g`],
+    [isEn ? "  Sugars" : "  Azúcares", `${Math.round(mix.carbsPerServing * 0.46)} g`],
+    [isEn ? "Sodium" : "Sodio", `${mix.sodiumPerServing} mg`],
+    ["Potasio", "134 mg"],
+    ["Calcio", "75 mg"],
+    ["Magnesio", "37 mg"],
+    ...(mix.caffeinePerServing > 0 ? [[isEn ? "Caffeine" : "Cafeína", `${mix.caffeinePerServing} mg`]] : []),
+  ] : [];
+
+  return (
+    <div style={{ perspective: 700, width: 200, margin: "0 auto", cursor: "pointer" }}
+         onClick={() => setFlipped(f => !f)}
+         title={isEn ? "Click to flip" : "Click para voltear"}>
+      <div style={{
+        width: 200, height: 280,
+        position: "relative",
+        transformStyle: "preserve-3d",
+        transition: "transform 0.55s cubic-bezier(0.4,0,0.2,1)",
+        transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+      }}>
+        {/* Front */}
+        <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}>
+          <svg viewBox="0 0 220 300" style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.22))" }}>
+            <defs>
+              <linearGradient id={`foilF-${flavor}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#B9BABC"/><stop offset="30%" stopColor="#EDEDED"/>
+                <stop offset="60%" stopColor="#9C9D9F"/><stop offset="100%" stopColor="#D8D9DA"/>
+              </linearGradient>
+              <clipPath id={`cpF-${flavor}`}><rect x="20" y="66" width="180" height="210" rx="6"/></clipPath>
+            </defs>
+            <rect x="4" y="4" width="212" height="292" rx="20" fill={`url(#foilF-${flavor})`}/>
+            <g stroke="#00000022" strokeWidth="1">
+              <line x1="16" y1="18" x2="204" y2="18"/><line x1="16" y1="24" x2="204" y2="24"/>
+              <line x1="16" y1="30" x2="204" y2="30"/><line x1="16" y1="36" x2="204" y2="36"/>
+            </g>
+            <path d="M4 46 L14 40 L14 52 Z" fill="#FFF"/><path d="M216 46 L206 40 L206 52 Z" fill="#FFF"/>
+            <g clipPath={`url(#cpF-${flavor})`}>
+              <rect x="20" y="66" width="180" height="210" fill={c2}/>
+              <path d="M20 66 H72 L96 276 H20 Z" fill={c1}/>
+              <path d="M20 250 L60 210 L80 230 L110 190 L160 230 L200 210 L200 276 L20 276 Z" fill="#FFF" opacity="0.14"/>
+            </g>
+            <rect x="20" y="66" width="180" height="210" rx="6" fill="none" stroke="#FFFFFF33"/>
+            <path d="M120 106 L130 90 L134 95 L140 86 L152 106" stroke="#FFF" strokeWidth="2.2" fill="none" strokeLinejoin="round" strokeLinecap="round"/>
+            <circle cx="140" cy="87" r="2" stroke="#FFF" strokeWidth="1.6" fill="none"/>
+            <text x="120" y="128" fill="#FFF" fontFamily={mono} fontWeight="800" fontSize="22" letterSpacing="-0.5">zenit</text>
+            <text x="121" y="140" fill="#FFF" fontFamily={mono} fontSize="6" letterSpacing="2" opacity="0.85">nutrition</text>
+            <text fill="#FFF" fontFamily={mono} fontWeight="700" fontSize="12" letterSpacing="2"
+                  transform="translate(40,240) rotate(-90)">{f.en.toUpperCase()}</text>
+            {mix && (
+              <text x="110" y="260" fill="#FFF" fontFamily={mono} fontSize="8" letterSpacing="0.5"
+                    textAnchor="middle" opacity="0.75">
+                {mix.carbsPerServing}g · {mix.sodiumPerServing}mg Na{mix.caffeinePerServing > 0 ? ` · ${mix.caffeinePerServing}mg caff` : ""}
+              </text>
+            )}
+            <text x="110" y="285" fill="#FFF" fontFamily={mono} fontSize="7" textAnchor="middle" opacity="0.5">
+              {isEn ? "click to flip ↻" : "click para voltear ↻"}
+            </text>
+          </svg>
+        </div>
+
+        {/* Back — nutrition label */}
+        <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+          <svg viewBox="0 0 220 300" style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.22))" }}>
+            <defs>
+              <linearGradient id={`foilB-${flavor}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#B9BABC"/><stop offset="30%" stopColor="#EDEDED"/>
+                <stop offset="60%" stopColor="#9C9D9F"/><stop offset="100%" stopColor="#D8D9DA"/>
+              </linearGradient>
+              <clipPath id={`cpB-${flavor}`}><rect x="20" y="66" width="180" height="210" rx="6"/></clipPath>
+            </defs>
+            <rect x="4" y="4" width="212" height="292" rx="20" fill={`url(#foilB-${flavor})`}/>
+            <g stroke="#00000022" strokeWidth="1">
+              <line x1="16" y1="18" x2="204" y2="18"/><line x1="16" y1="24" x2="204" y2="24"/>
+              <line x1="16" y1="30" x2="204" y2="30"/><line x1="16" y1="36" x2="204" y2="36"/>
+            </g>
+            <path d="M4 46 L14 40 L14 52 Z" fill="#FFF"/><path d="M216 46 L206 40 L206 52 Z" fill="#FFF"/>
+            <g clipPath={`url(#cpB-${flavor})`}>
+              <rect x="20" y="66" width="180" height="210" fill={c2}/>
+              <path d="M20 66 H55 L35 276 H20 Z" fill={c1} opacity="0.55"/>
+              <path d="M200 66 H165 L185 276 H200 Z" fill={c1} opacity="0.55"/>
+            </g>
+            <text x="34" y="83" fill="#FFF" fontFamily={mono} fontSize="5.5" letterSpacing="0.4" opacity="0.9">Electrolitos: Mg · Na · K · Ca</text>
+            {mix && <text x="186" y="83" fill="#FFF" fontFamily={mono} fontSize="5.5" opacity="0.9" textAnchor="end">{mix.ratio}</text>}
+            {/* white nutrition box */}
+            <rect x="30" y="88" width="160" height={30 + nutRows.length * 13} rx="3" fill="#FFF"/>
+            <rect x="30" y="88" width="160" height="17" fill="#111"/>
+            <text x="110" y="100" fill="#FFF" fontFamily={mono} fontWeight="700" fontSize="7" letterSpacing="0.2" textAnchor="middle">
+              {isEn ? "Nutrition Facts" : "Información Nutricional"}
+            </text>
+            <line x1="30" y1="105" x2="190" y2="105" stroke="#ccc" strokeWidth="0.5"/>
+            {nutRows.map(([label, val], i) => (
+              <g key={String(label)}>
+                <text x="34" y={113 + i * 13} fill="#111" fontFamily={mono} fontSize="6.5">{label}</text>
+                <text x="186" y={113 + i * 13} fill="#111" fontFamily={mono} fontSize="6.5" textAnchor="end">{val}</text>
+                <line x1="30" y1={116 + i * 13} x2="190" y2={116 + i * 13} stroke="#eee" strokeWidth="0.4"/>
+              </g>
+            ))}
+            <text x="110" y="272" fill="#FFF" fontFamily={mono} fontWeight="800" fontSize="14" letterSpacing="-0.3" textAnchor="middle" opacity="0.95">zenit</text>
+            <text x="110" y="285" fill="#FFF" fontFamily={mono} fontSize="7" textAnchor="middle" opacity="0.5">
+              {isEn ? "click to flip ↻" : "click para voltear ↻"}
+            </text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EF({ label, value, onDec, onInc, warn }: {
   label: string; value: string | number; onDec: () => void; onInc: () => void; warn?: boolean;
 }) {
@@ -93,7 +214,7 @@ function EF({ label, value, onDec, onInc, warn }: {
   );
 }
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Main Page ───────────────────────────────────────────────
 
 export default function MixPage() {
   const { locale } = useLocale();
@@ -355,6 +476,8 @@ export default function MixPage() {
               </Button>
             </div>
             <div className="flex flex-col gap-4">
+              {/* Live flip bag — front: flavor bag, back: nutrition label with live values */}
+              <FlipBag flavor={flavorKey} mix={mix} isEn={isEn} />
               <div className="rounded-2xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
                 <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--ink-3)" }}>
                   {isEn ? "Athlete Profile" : "Tu Perfil"}
