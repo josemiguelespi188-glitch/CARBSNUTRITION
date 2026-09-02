@@ -31,6 +31,8 @@ export default function RootLayout({
       className={`${ibmPlexSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-bg text-ink">
+        {/* Runs before paint — reads user's saved theme and sets data-theme before hydration */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('zenit-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}` }} />
         <LocaleProvider>{children}</LocaleProvider>
       </body>
     </html>

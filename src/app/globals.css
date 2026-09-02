@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* ─── Zenit Brand Tokens — Light Mode ─── */
+/* ─── Zenit Brand Tokens — Light (default) ─── */
 :root {
-  --bg: #F3F3F1;
+  --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #E9E9E6;
   --ink: #0B0B0C;
@@ -10,28 +10,23 @@
   --ink-3: #8A8B8E;
   --line: #D3D3CF;
   --line-strong: #0B0B0C;
-  --accent-1: #A9331A;
-  --accent-2: #E2792F;
+  --error: #C41C00;
 }
 
-/* ─── Dark Mode ─── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0B0B0C;
-    --surface: #141416;
-    --surface-2: #1C1C1E;
-    --ink: #F3F3F1;
-    --ink-2: #ABACAF;
-    --ink-3: #6F7073;
-    --line: #2B2B2D;
-    --line-strong: #F3F3F1;
-    --accent-1: #C24726;
-    --accent-2: #EB8B45;
-  }
+/* ─── Dark Mode — only via [data-theme="dark"], never by OS ─── */
+[data-theme="dark"] {
+  --bg: #0B0B0C;
+  --surface: #141416;
+  --surface-2: #1C1C1E;
+  --ink: #F3F3F1;
+  --ink-2: #ABACAF;
+  --ink-3: #6F7073;
+  --line: #2B2B2D;
+  --line-strong: #F3F3F1;
+  --error: #FF6B6B;
 }
 
 @theme inline {
-  /* Brand color tokens exposed as Tailwind utilities */
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -40,10 +35,7 @@
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-accent-1: var(--accent-1);
-  --color-accent-2: var(--accent-2);
-
-  /* Typography */
+  --color-error: var(--error);
   --font-sans: var(--font-ibm-plex-sans), 'IBM Plex Sans', Arial, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
 }

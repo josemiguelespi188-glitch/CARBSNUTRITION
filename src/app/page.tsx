@@ -15,7 +15,7 @@ export default function Home() {
 
       {/* HERO */}
       <section className="relative flex flex-col items-center justify-center px-6 pt-40 pb-28 text-center overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(169,51,26,0.07),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(11,11,12,0.04),transparent_60%)]" />
         <p className="text-xs uppercase tracking-[0.4em] text-ink-3">{t.hero.eyebrow}</p>
         <h1
           className="mt-5 max-w-3xl text-4xl sm:text-6xl font-bold tracking-tight leading-[1.05] text-ink"
@@ -28,7 +28,7 @@ export default function Home() {
         </p>
         <div className="mt-9 flex flex-col items-center gap-3">
           <Link href="/assessment">
-            <Button variant="accent" size="lg">{t.hero.cta}</Button>
+            <Button variant="primary" size="lg">{t.hero.cta}</Button>
           </Link>
           <span className="text-xs text-ink-3 tracking-wide">{t.hero.secondary}</span>
         </div>
@@ -87,7 +87,7 @@ export default function Home() {
           <ul className="mt-10 grid gap-4 sm:grid-cols-2">
             {t.benefits.items.map((item) => (
               <li key={item} className="flex items-start gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-sm text-ink-2">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-1" />
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-3" />
                 {item}
               </li>
             ))}
@@ -135,7 +135,7 @@ export default function Home() {
           {t.finalCta.title}
         </h2>
         <Link href="/assessment" className="mt-8 inline-block">
-          <Button variant="accent" size="lg">{t.finalCta.cta}</Button>
+          <Button variant="primary" size="lg">{t.finalCta.cta}</Button>
         </Link>
       </section>
 
