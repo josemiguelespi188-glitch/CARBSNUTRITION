@@ -21,7 +21,7 @@ export default function Home() {
 
   function selectFlavor(key: string) {
     try { sessionStorage.setItem("zenit:flavor", key); } catch { /* ignore */ }
-    router.push("/assessment");
+    router.push("/cuenta");
   }
 
   return (
@@ -42,7 +42,7 @@ export default function Home() {
           {t.hero.subtitle}
         </p>
         <div className="mt-9 flex flex-col items-center gap-3">
-          <Link href="/assessment">
+          <Link href="/cuenta">
             <Button variant="primary" size="lg">{t.hero.cta}</Button>
           </Link>
           <span className="text-xs text-ink-3 tracking-wide">{t.hero.secondary}</span>
@@ -57,7 +57,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FLAVOR SELECTOR — request test product */}
+      {/* FLAVOR SELECTOR */}
       <section className="border-t border-line px-6 py-28 bg-surface-2">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs uppercase tracking-[0.4em] text-ink-3">
@@ -90,13 +90,10 @@ export default function Home() {
               </button>
             ))}
           </div>
-          <p className="mt-8 text-xs text-ink-3">
-            {isEn ? "Kiwi · Mango · Piña are prototypes — final colors defined at launch." : "Kiwi · Mango · Piña son prototipos — colores finales al lanzamiento."}
-          </p>
         </div>
       </section>
 
-      {/* WHY PERSONALIZATION MATTERS */}
+      {/* WHY */}
       <section className="border-t border-line px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.why.title}</h2>
@@ -111,7 +108,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
+      {/* HOW */}
       <section className="border-t border-line px-6 py-24 bg-surface-2">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.how.title}</h2>
@@ -126,7 +123,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SCIENTIFIC APPROACH */}
+      {/* SCIENCE */}
       <section className="border-t border-line px-6 py-24">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink">{t.science.title}</h2>
@@ -134,7 +131,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PERFORMANCE BENEFITS */}
+      {/* BENEFITS */}
       <section className="border-t border-line px-6 py-24 bg-surface-2">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.benefits.title}</h2>
@@ -188,17 +185,14 @@ export default function Home() {
         <h2 className="mx-auto max-w-2xl text-2xl sm:text-4xl font-semibold tracking-tight leading-tight text-ink">
           {t.finalCta.title}
         </h2>
-        <Link href="/assessment" className="mt-8 inline-block">
+        <Link href="/cuenta" className="mt-8 inline-block">
           <Button variant="primary" size="lg">{t.finalCta.cta}</Button>
         </Link>
       </section>
 
       <footer className="border-t border-line px-6 py-10">
         <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-3">
-          <span
-            className="font-bold tracking-[0.25em]"
-            style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}
-          >
+          <span className="font-bold tracking-[0.25em]" style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
             {t.brand.name}
           </span>
           <span>{t.footer.rights}</span>
