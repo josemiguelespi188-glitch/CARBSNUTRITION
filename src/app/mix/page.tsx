@@ -102,11 +102,11 @@ export default function MixPage() {
           <div className="mb-8 overflow-hidden rounded-3xl border border-line bg-surface">
             <div className="bg-gradient-to-b from-surface-2 to-surface px-8 py-12 text-center">
               <p className="text-[10px] uppercase tracking-[0.5em] text-ink-3"
-                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
+                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace))" }}>
                 ZENIT
               </p>
               <h2 className="mt-4 text-3xl sm:text-5xl font-black uppercase tracking-tight text-ink"
-                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
+                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace))" }}>
                 {(answers.name.split(" ")[0] || answers.name).toUpperCase()}&apos;S CUSTOM FUEL
               </h2>
               {answers.eventName && (
@@ -197,7 +197,7 @@ export default function MixPage() {
             {warnings.length > 0 && (
               <div className="mt-6 space-y-2">
                 {warnings.map((w) => (
-                  <div key={w} className="rounded-xl border border-accent-2 bg-surface px-4 py-3 text-sm text-ink-2">
+                  <div key={w} className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink-2">
                     ⚠️ {editWarningCopy[w][locale]}
                   </div>
                 ))}
@@ -236,7 +236,7 @@ export default function MixPage() {
                       contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--ink)" }}
                       labelFormatter={(w) => (isEn ? `Week ${w}` : `Semana ${w}`)}
                     />
-                    <Bar dataKey="scoops" fill="var(--accent-1)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="scoops" fill="var(--ink-2)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -295,7 +295,7 @@ export default function MixPage() {
           </section>
 
           <div className="mt-12 flex flex-col items-center gap-3 text-center">
-            <Button variant="accent" size="lg">{isEn ? "Order This Formula" : "Ordenar Esta Fórmula"}</Button>
+            <Button size="lg">{isEn ? "Order This Formula" : "Ordenar Esta Fórmula"}</Button>
             <Link href="/assessment" className="text-xs text-ink-3 underline underline-offset-4 hover:text-ink-2">
               {isEn ? "Retake the assessment" : "Repetir la evaluación"}
             </Link>
