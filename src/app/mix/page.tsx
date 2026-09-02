@@ -6,13 +6,10 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { AssessmentAnswers, CustomMix, FormulaRecommendation } from "@/lib/types";
 import {
   buildPackRecommendation,
-  buildDualMix,
-  buildScoopPlan,
-  buildRaceDayPlan,
   editWarningCopy,
   getEditWarnings,
 } from "@/lib/recommendation";
@@ -26,45 +23,55 @@ import {
   CartesianGrid,
 } from "recharts";
 
+type Stage = "formula" | "refine" | "order";
+
+const BRAND_FLAVORS = [
+  { key: "peach", en: "Peach", es: "Durazno", color: "#E8946A" },
+  { key: "kiwi", en: "Kiwi", es: "Kiwi", color: "#6BAF5E" },
+  { key: "pineapple", en: "Pineapple", es: "Piña", color: "#E8C44A" },
+  { key: "mango", en: "Mango", es: "Mango", color: "#E8A040" },
+];
+
+const PRICE_OPTIONS = [
+  { qty: 1, price: 35, servings: 14, save: null },
+  { qty: 3, price: 95, servings: 42, save: "9%" },
+  { qty: 6, price: 175, servings: 84, save: "17%" },
+];
+
 const carbSteps = [25, 50, 75, 100, 125, 150] as const;
 const sodiumSteps = [200, 400, 600, 800, 1000] as const;
 const caffeineSteps = [0, 25, 50, 75, 100] as const;
 
-type ChatMsg = { role: "user" | "assistant"; text: string };
-
 export default function MixPage() {
   const { locale } = useLocale();
   const router = useRouter();
+  const isEn = locale === "en";
 
   const [answers, setAnswers] = useState<AssessmentAnswers | null>(null);
   const [mix, setMix] = useState<CustomMix | null>(null);
-  const [chat, setChat] = useState<ChatMsg[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
+  const [stage, setStage] = useState<Stage>("formula");
+  const [flavorKey, setFlavorKey] = useState("peach");
+  const [ctx, setCtx] = useState({ goal: "race", eventName: "", eventDate: "", carbTarget: 60, caffeineGoal: "both" });
+  const [qty, setQty] = useState(3);
+  const [ordered, setOrdered] = useState(false);
 
   useEffect(() => {
     const a = sessionStorage.getItem("carbyn:answers");
     const m = sessionStorage.getItem("carbyn:mix");
+    const f = sessionStorage.getItem("zenit:flavor");
     if (!a || !m) { router.replace("/assessment"); return; }
     setAnswers(JSON.parse(a));
     setMix(JSON.parse(m));
+    if (f && BRAND_FLAVORS.find(x => x.key === f)) setFlavorKey(f);
   }, [router]);
 
   if (!answers || !mix) return null;
 
-  const pack = buildPackRecommendation(answers);
+  const flavor = BRAND_FLAVORS.find(f => f.key === flavorKey) ?? BRAND_FLAVORS[0];
   const warnings = getEditWarnings(mix, mix);
-  const scoopPlan = buildScoopPlan(answers);
-  const totalScoops = scoopPlan.reduce((sum, w) => sum + w.scoops, 0);
-  const weeksToEvent = answers.eventDate
-    ? Math.max(0, Math.round((new Date(answers.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)))
-    : null;
-  const raceDay = buildRaceDayPlan(answers, mix);
-  const showDual = answers.caffeineGoal === "both" || answers.goal === "both";
-  const dual = showDual ? buildDualMix(answers) : null;
-  const isEn = locale === "en";
+  const selectedPrice = PRICE_OPTIONS.find(o => o.qty === qty) ?? PRICE_OPTIONS[1];
 
-  function update<K extends keyof FormulaRecommendation>(key: K, value: FormulaRecommendation[K]) {
+  function updateMix<K extends keyof FormulaRecommendation>(key: K, value: FormulaRecommendation[K]) {
     setMix((prev) => {
       if (!prev) return prev;
       const next = { ...prev, [key]: value };
@@ -73,24 +80,11 @@ export default function MixPage() {
     });
   }
 
-  async function sendChat() {
-    const question = chatInput.trim();
-    if (!question || !answers || !mix) return;
-    setChat((c) => [...c, { role: "user", text: question }]);
-    setChatInput("");
-    setChatBusy(true);
-    try {
-      const res = await fetch("/api/ai-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, answers, formula: mix, locale }),
-      });
-      const data = await res.json();
-      setChat((c) => [...c, { role: "assistant", text: data.answer || (isEn ? "Sorry, I couldn't process that." : "Lo siento, no pude procesar eso.") }]);
-    } finally {
-      setChatBusy(false);
-    }
-  }
+  const STAGES: { key: Stage; en: string; es: string }[] = [
+    { key: "formula", en: "Formula", es: "Fórmula" },
+    { key: "refine", en: "Refine", es: "Perfeccionar" },
+    { key: "order", en: "Order", es: "Cantidad" },
+  ];
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
@@ -98,244 +92,449 @@ export default function MixPage() {
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-3xl">
 
-          {/* Premium product mockup */}
-          <div className="mb-8 overflow-hidden rounded-3xl border border-line bg-surface">
-            <div className="bg-gradient-to-b from-surface-2 to-surface px-8 py-12 text-center">
-              <p className="text-[10px] uppercase tracking-[0.5em] text-ink-3"
-                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace))" }}>
-                ZENIT
-              </p>
-              <h2 className="mt-4 text-3xl sm:text-5xl font-black uppercase tracking-tight text-ink"
-                style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace))" }}>
-                {(answers.name.split(" ")[0] || answers.name).toUpperCase()}&apos;S CUSTOM FUEL
-              </h2>
-              {answers.eventName && (
-                <p className="mt-3 text-sm uppercase tracking-[0.25em] text-ink-2">
-                  {isEn ? `Built for ${answers.eventName}` : `Hecho para ${answers.eventName}`}
-                </p>
-              )}
-              <p className="mt-4 italic text-ink-2">{mix.motivationalMessage[locale]}</p>
-              <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-line px-5 py-2 text-xs text-ink-2">
-                <span>{mix.carbsPerServing}g {isEn ? "carbs" : "carbos"}</span>
-                <span className="opacity-30">|</span>
-                <span>{mix.sodiumPerServing}mg {isEn ? "sodium" : "sodio"}</span>
-                <span className="opacity-30">|</span>
-                <span>{mix.caffeinePerServing}mg {isEn ? "caffeine" : "cafeína"}</span>
+          {/* Stage indicator */}
+          <div className="flex items-center gap-2 mb-10">
+            {STAGES.map((s, i) => (
+              <div key={s.key} className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (s.key === "formula") setStage("formula");
+                    else if (s.key === "refine" && stage === "order") setStage("refine");
+                  }}
+                  className={`text-xs uppercase tracking-widest transition-colors ${
+                    stage === s.key ? "text-ink font-semibold" : "text-ink-3"
+                  }`}
+                >
+                  {isEn ? s.en : s.es}
+                </button>
+                {i < STAGES.length - 1 && <span className="text-line text-xs">→</span>}
               </div>
-            </div>
+            ))}
           </div>
 
-          {/* AI explanation */}
-          <section className="mt-10">
-            <Card>
-              <CardTitle>{isEn ? "Why We Recommended This" : "Por Qué Te Recomendamos Esto"}</CardTitle>
-              <div className="mt-4 space-y-3">
-                {mix.reasoning.map((r) => (
-                  <p key={r.field} className="text-sm text-ink-2 leading-relaxed">{r.explanation[locale]}</p>
-                ))}
-              </div>
-            </Card>
-          </section>
+          {/* STAGE 1: FÓRMULA */}
+          {stage === "formula" && (
+            <div>
+              <div className="flex flex-col lg:flex-row gap-10 items-start">
+                {/* Product bag visual */}
+                <div className="shrink-0 mx-auto lg:mx-0">
+                  <ProductBag flavor={flavor} isEn={isEn} />
+                </div>
 
-          {/* Mix editor */}
-          <section className="mt-10">
-            <h2 className="text-xl font-semibold tracking-tight text-ink">{isEn ? "Your Mix Editor" : "Tu Editor de Mezcla"}</h2>
-            <p className="mt-1 text-sm text-ink-3">
-              {isEn ? "Adjust any value — we'll let you know if you stray far from your recommendation." : "Ajusta cualquier valor — te avisaremos si te alejas mucho de tu recomendación."}
-            </p>
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <EditorField label={isEn ? "Carbs per serving" : "Carbohidratos por porción"}>
-                <StepSelect value={mix.carbsPerServing} steps={carbSteps} suffix="g" onChange={(v) => update("carbsPerServing", v as FormulaRecommendation["carbsPerServing"])} />
-              </EditorField>
-              <EditorField label={isEn ? "Sodium per serving" : "Sodio por porción"}>
-                <StepSelect value={mix.sodiumPerServing} steps={sodiumSteps} suffix="mg" onChange={(v) => update("sodiumPerServing", v as FormulaRecommendation["sodiumPerServing"])} />
-              </EditorField>
-              <EditorField label={isEn ? "Caffeine per serving" : "Cafeína por porción"}>
-                <StepSelect value={mix.caffeinePerServing} steps={caffeineSteps} suffix="mg" onChange={(v) => update("caffeinePerServing", v as FormulaRecommendation["caffeinePerServing"])} />
-              </EditorField>
-              <EditorField label={isEn ? "Malto:Fructose ratio" : "Proporción Malto:Fructosa"}>
-                <div className="flex gap-2">
-                  {(["1:0.8", "2:1"] as const).map((r) => (
-                    <button key={r} onClick={() => update("ratio", r)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.ratio === r ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </EditorField>
-              <EditorField label={isEn ? "Flavor strength" : "Intensidad del sabor"}>
-                <div className="flex gap-2">
-                  {(["lite", "regular", "mega"] as const).map((s) => (
-                    <button key={s} onClick={() => update("flavorStrength", s)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${mix.flavorStrength === s ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </EditorField>
-              <EditorField label={isEn ? "Preservatives" : "Conservadores"}>
-                <div className="flex gap-2">
-                  {(["yes", "no"] as const).map((v) => (
-                    <button key={v} onClick={() => update("preservatives", v)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.preservatives === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                      {v === "yes" ? (isEn ? "Yes (recommended)" : "Sí (recomendado)") : (isEn ? "No preservatives" : "Sin conservadores")}
-                    </button>
-                  ))}
-                </div>
-              </EditorField>
-              <EditorField label={isEn ? "Include a scooper?" : "¿Incluir cuchara dosificadora?"}>
-                <div className="flex gap-2">
-                  {(["yes", "no"] as const).map((v) => (
-                    <button key={v} onClick={() => update("scooper", v)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.scooper === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
-                      {v === "yes" ? (isEn ? "Yes" : "Sí") : "No"}
-                    </button>
-                  ))}
-                </div>
-              </EditorField>
-            </div>
-            {warnings.length > 0 && (
-              <div className="mt-6 space-y-2">
-                {warnings.map((w) => (
-                  <div key={w} className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink-2">
-                    ⚠️ {editWarningCopy[w][locale]}
+                {/* Formula data */}
+                <div className="flex-1">
+                  <p className="text-xs uppercase tracking-[0.4em] text-ink-3">zenit</p>
+                  <h1
+                    className="mt-2 text-3xl sm:text-4xl font-black uppercase tracking-tight text-ink"
+                    style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}
+                  >
+                    {(answers.name.split(" ")[0] || answers.name).toUpperCase()}&apos;S FUEL
+                  </h1>
+                  <p className="mt-2 italic text-ink-3 text-sm">{mix.motivationalMessage[locale]}</p>
+
+                  {/* Formula data table */}
+                  <div className="mt-6 divide-y divide-line border-y border-line">
+                    {[
+                      [isEn ? "Carbohydrates" : "Carbohidratos", `${mix.carbsPerServing} g`],
+                      [isEn ? "Sodium" : "Sodio", `${mix.sodiumPerServing} mg`],
+                      [isEn ? "Caffeine" : "Cafeína", `${mix.caffeinePerServing} mg`],
+                      [isEn ? "Ratio Malto:Fructose" : "Relación Malto:Fructosa", mix.ratio],
+                      [isEn ? "Calories/serving" : "Calorías/porción", `${Math.round(mix.carbsPerServing * 4)} kcal`],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex items-center justify-between py-3">
+                        <span className="text-xs uppercase tracking-widest text-ink-3">{k}</span>
+                        <span className="text-sm font-semibold text-ink" style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>{v}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
 
-          {/* Pack recommendation */}
-          <section className="mt-10">
-            <Card>
-              <CardTitle>{isEn ? "Recommended Supply" : "Suministro Recomendado"}</CardTitle>
-              <CardBody>
-                <p className="text-base text-ink font-medium">{pack.label[locale]}</p>
-                <p className="mt-2">{pack.reasoning[locale]}</p>
-              </CardBody>
-            </Card>
-          </section>
-
-          {/* Scoop planning */}
-          <section className="mt-10">
-            <Card>
-              <CardTitle>{isEn ? "Scoop Plan" : "Plan de Cucharadas"}</CardTitle>
-              <div className="mt-2 flex flex-wrap gap-6 text-sm text-ink-2">
-                <span>{isEn ? "Total scoops:" : "Cucharadas totales:"} <span className="font-semibold text-ink">{totalScoops}</span></span>
-                {weeksToEvent !== null && (
-                  <span>{isEn ? "Weeks until event:" : "Semanas hasta el evento:"} <span className="font-semibold text-ink">{weeksToEvent}</span></span>
-                )}
-              </div>
-              <div className="mt-6 h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={scoopPlan} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                    <CartesianGrid stroke="var(--line)" vertical={false} />
-                    <XAxis dataKey="week" stroke="var(--ink-3)" fontSize={11} tickLine={false} />
-                    <YAxis stroke="var(--ink-3)" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={{ fill: "var(--surface-2)" }}
-                      contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--ink)" }}
-                      labelFormatter={(w) => (isEn ? `Week ${w}` : `Semana ${w}`)}
-                    />
-                    <Bar dataKey="scoops" fill="var(--ink-2)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </section>
-
-          {/* Race day plan */}
-          <section className="mt-10">
-            <Card>
-              <CardTitle>{isEn ? "Race Day Fueling Plan" : "Plan de Alimentación del Día de Carrera"}</CardTitle>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <PhaseCard title={isEn ? "Pre-Race" : "Pre-Carrera"} metric={`${raceDay.preRace.carbs}g`} desc={raceDay.preRace.description[locale]} />
-                {raceDay.bike && <PhaseCard title={isEn ? "Bike" : "Bici"} metric={`${raceDay.bike.carbsPerHour}g/h`} desc={raceDay.bike.description[locale]} />}
-                {raceDay.run && <PhaseCard title={isEn ? "Run" : "Carrera"} metric={`${raceDay.run.carbsPerHour}g/h`} desc={raceDay.run.description[locale]} />}
-                <PhaseCard title={isEn ? "Recovery" : "Recuperación"} metric={`${raceDay.recovery.carbs}g`} desc={raceDay.recovery.description[locale]} />
-              </div>
-            </Card>
-          </section>
-
-          {/* Dual mix */}
-          {dual && (
-            <section className="mt-10">
-              <Card>
-                <CardTitle>{isEn ? "Training Mix vs Race Mix" : "Mezcla de Entrenamiento vs Carrera"}</CardTitle>
-                <p className="mt-2 text-sm text-ink-2 leading-relaxed">{dual.reasoning[locale]}</p>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <MixSummary title={isEn ? "Training Mix" : "Mezcla de Entrenamiento"} formula={dual.training} isEn={isEn} />
-                  <MixSummary title={isEn ? "Race Mix" : "Mezcla de Carrera"} formula={dual.race} isEn={isEn} />
+                  {/* AI Reasoning */}
+                  <div className="mt-6 space-y-2">
+                    {mix.reasoning.map((r) => (
+                      <p key={r.field} className="text-xs text-ink-3 leading-relaxed">{r.explanation[locale]}</p>
+                    ))}
+                  </div>
                 </div>
-              </Card>
-            </section>
+              </div>
+
+              {/* Flavor selector */}
+              <div className="mt-12">
+                <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">
+                  {isEn ? "Choose your flavor" : "Elige tu sabor"}
+                </p>
+                <div className="grid grid-cols-4 gap-3">
+                  {BRAND_FLAVORS.map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setFlavorKey(f.key)}
+                      className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-4 transition-all ${
+                        flavorKey === f.key ? "border-ink bg-ink text-bg" : "border-line text-ink-2 hover:border-ink-2"
+                      }`}
+                    >
+                      <div className="h-8 w-8 rounded-full ring-1 ring-black/10" style={{ background: f.color }} />
+                      <span className="text-xs font-medium">{isEn ? f.en : f.es}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-10 flex justify-end">
+                <Button onClick={() => setStage("refine")}>
+                  {isEn ? "Refine formula →" : "Perfeccionar →"}
+                </Button>
+              </div>
+            </div>
           )}
 
-          {/* AI chat */}
-          <section className="mt-10">
-            <Card>
-              <CardTitle>{isEn ? "Ask Our AI Advisor" : "Pregúntale a Nuestro Asesor de IA"}</CardTitle>
+          {/* STAGE 2: PERFECCIONAR */}
+          {stage === "refine" && (
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">
+                {isEn ? "Refine your formula" : "Perfecciona tu fórmula"}
+              </h2>
               <p className="mt-1 text-sm text-ink-3">
-                {isEn ? `e.g. "Why did you give me ${mix.sodiumPerServing}mg of sodium?"` : `Ej. "¿Por qué me diste ${mix.sodiumPerServing}mg de sodio?"`}
+                {isEn ? "Adjust values and tell us about your race context." : "Ajusta valores y cuéntanos sobre tu contexto de carrera."}
               </p>
-              <div className="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
-                {chat.map((m, i) => (
-                  <div key={i} className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "ml-8 bg-ink text-bg" : "mr-8 bg-surface-2 text-ink-2"}`}>
-                    {m.text}
-                  </div>
-                ))}
-                {chatBusy && <div className="mr-8 rounded-xl bg-surface-2 px-4 py-2.5 text-sm text-ink-3">{isEn ? "Thinking…" : "Pensando…"}</div>}
-              </div>
-              <div className="mt-4 flex gap-2">
-                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendChat()}
-                  placeholder={isEn ? "Type your question…" : "Escribe tu pregunta…"}
-                  className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none" />
-                <Button size="sm" onClick={sendChat} disabled={chatBusy || !chatInput.trim()}>{isEn ? "Send" : "Enviar"}</Button>
-              </div>
-            </Card>
-          </section>
 
-          <div className="mt-12 flex flex-col items-center gap-3 text-center">
-            <Button size="lg">{isEn ? "Order This Formula" : "Ordenar Esta Fórmula"}</Button>
-            <Link href="/assessment" className="text-xs text-ink-3 underline underline-offset-4 hover:text-ink-2">
-              {isEn ? "Retake the assessment" : "Repetir la evaluación"}
-            </Link>
-          </div>
+              {/* Mix editor */}
+              <div className="mt-8 grid gap-5 sm:grid-cols-2">
+                <EditorField label={isEn ? "Carbs per serving" : "Carbohidratos por porción"}>
+                  <StepSelect value={mix.carbsPerServing} steps={carbSteps} suffix="g" onChange={(v) => updateMix("carbsPerServing", v as FormulaRecommendation["carbsPerServing"])} />
+                </EditorField>
+                <EditorField label={isEn ? "Sodium per serving" : "Sodio por porción"}>
+                  <StepSelect value={mix.sodiumPerServing} steps={sodiumSteps} suffix="mg" onChange={(v) => updateMix("sodiumPerServing", v as FormulaRecommendation["sodiumPerServing"])} />
+                </EditorField>
+                <EditorField label={isEn ? "Caffeine per serving" : "Cafeína por porción"}>
+                  <StepSelect value={mix.caffeinePerServing} steps={caffeineSteps} suffix="mg" onChange={(v) => updateMix("caffeinePerServing", v as FormulaRecommendation["caffeinePerServing"])} />
+                </EditorField>
+                <EditorField label={isEn ? "Malto:Fructose ratio" : "Proporción Malto:Fructosa"}>
+                  <div className="flex gap-2">
+                    {(["1:0.8", "2:1"] as const).map((r) => (
+                      <button key={r} onClick={() => updateMix("ratio", r)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.ratio === r ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </EditorField>
+                <EditorField label={isEn ? "Flavor strength" : "Intensidad del sabor"}>
+                  <div className="flex gap-2">
+                    {(["lite", "regular", "mega"] as const).map((s) => (
+                      <button key={s} onClick={() => updateMix("flavorStrength", s)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${mix.flavorStrength === s ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </EditorField>
+                <EditorField label={isEn ? "Preservatives" : "Conservadores"}>
+                  <div className="flex gap-2">
+                    {(["yes", "no"] as const).map((v) => (
+                      <button key={v} onClick={() => updateMix("preservatives", v)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${mix.preservatives === v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
+                        {v === "yes" ? (isEn ? "Yes" : "Sí") : (isEn ? "No" : "No")}
+                      </button>
+                    ))}
+                  </div>
+                </EditorField>
+              </div>
+
+              {warnings.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {warnings.map((w) => (
+                    <div key={w} className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink-2">
+                      ⚠️ {editWarningCopy[w][locale]}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Context questions */}
+              <div className="mt-10 pt-10 border-t border-line">
+                <p className="text-xs uppercase tracking-widest text-ink-3 mb-6">
+                  {isEn ? "Race context" : "Contexto de carrera"}
+                </p>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-ink-3 mb-3">
+                      {isEn ? "This formula is for…" : "Esta fórmula es para…"}
+                    </label>
+                    <div className="flex gap-2">
+                      {[
+                        { v: "race", en: "Race", es: "Carrera" },
+                        { v: "training", en: "Training", es: "Entrenamiento" },
+                        { v: "both", en: "Both", es: "Ambos" },
+                      ].map((o) => (
+                        <button key={o.v} onClick={() => setCtx(c => ({ ...c, goal: o.v }))}
+                          className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${ctx.goal === o.v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
+                          {isEn ? o.en : o.es}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(ctx.goal === "race" || ctx.goal === "both") && (
+                    <>
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest text-ink-3 mb-2">
+                          {isEn ? "Event name (optional)" : "Nombre del evento (opcional)"}
+                        </label>
+                        <input
+                          value={ctx.eventName}
+                          onChange={e => setCtx(c => ({ ...c, eventName: e.target.value }))}
+                          placeholder={isEn ? "e.g. IRONMAN 70.3 Cartagena" : "Ej. IRONMAN 70.3 Cartagena"}
+                          className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest text-ink-3 mb-2">
+                          {isEn ? "Event date (optional)" : "Fecha del evento (opcional)"}
+                        </label>
+                        <input
+                          type="date"
+                          value={ctx.eventDate}
+                          onChange={e => setCtx(c => ({ ...c, eventDate: e.target.value }))}
+                          className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink focus:border-ink focus:outline-none"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-ink-3 mb-2">
+                      {isEn ? "Carb target per hour (g)" : "Objetivo de carbohidratos por hora (g)"}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[30, 45, 60, 75, 90, 120].map(n => (
+                        <button key={n} onClick={() => setCtx(c => ({ ...c, carbTarget: n }))}
+                          className={`rounded-lg border px-4 py-2 text-sm transition-colors ${ctx.carbTarget === n ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
+                          {n}g
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-ink-3 mb-3">
+                      {isEn ? "Caffeine: one mix or two?" : "¿Cafeína: una mezcla o dos?"}
+                    </label>
+                    <div className="flex gap-2">
+                      {[
+                        { v: "race_only", en: "Race only (1 mix)", es: "Solo carrera (1 mezcla)" },
+                        { v: "both", en: "Training + Race (2 mixes)", es: "Entrenamiento + Carrera (2 mezclas)" },
+                      ].map((o) => (
+                        <button key={o.v} onClick={() => setCtx(c => ({ ...c, caffeineGoal: o.v }))}
+                          className={`flex-1 rounded-lg border px-3 py-2 text-xs text-left transition-colors ${ctx.caffeineGoal === o.v ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"}`}>
+                          {isEn ? o.en : o.es}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-10 flex items-center justify-between">
+                <Button variant="ghost" onClick={() => setStage("formula")}>
+                  {isEn ? "← Back" : "← Atrás"}
+                </Button>
+                <Button onClick={() => setStage("order")}>
+                  {isEn ? "See quantity →" : "Ver cantidad →"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STAGE 3: CANTIDAD Y PAGO */}
+          {stage === "order" && (
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">
+                {isEn ? "Quantity & order" : "Cantidad y pedido"}
+              </h2>
+
+              {/* Order summary card */}
+              <div className="mt-8 rounded-2xl border border-line bg-surface p-6">
+                <div className="flex items-start gap-6">
+                  <div className="shrink-0" style={{ width: 80 }}>
+                    <MiniProductBag flavor={flavor} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs uppercase tracking-widest text-ink-3">zenit</p>
+                    <p className="mt-1 text-lg font-black uppercase text-ink" style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
+                      {(answers.name.split(" ")[0] || answers.name).toUpperCase()}&apos;S FUEL
+                    </p>
+                    <p className="mt-1 text-sm text-ink-2">
+                      {isEn ? flavor.en : flavor.es} · {mix.carbsPerServing}g carbs · {mix.sodiumPerServing}mg Na · {mix.caffeinePerServing}mg caf
+                    </p>
+                    {ctx.eventName && (
+                      <p className="mt-1 text-xs text-ink-3">
+                        {isEn ? "For:" : "Para:"} {ctx.eventName}
+                        {ctx.eventDate ? ` · ${new Date(ctx.eventDate).toLocaleDateString(locale === "en" ? "en-US" : "es")}` : ""}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-ink-3">
+                      {ctx.caffeineGoal === "both"
+                        ? (isEn ? "2 mixes: training (no caf) + race (with caf)" : "2 mezclas: entrenamiento (sin caf) + carrera (con caf)")
+                        : (isEn ? "1 mix with caffeine for race" : "1 mezcla con cafeína para carrera")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quantity options */}
+              <div className="mt-10">
+                <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">
+                  {isEn ? "Select quantity" : "Selecciona cantidad"}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {PRICE_OPTIONS.map((o) => (
+                    <button
+                      key={o.qty}
+                      onClick={() => setQty(o.qty)}
+                      className={`rounded-2xl border p-5 text-left transition-all ${
+                        qty === o.qty ? "border-ink bg-ink text-bg" : "border-line hover:border-ink-2"
+                      }`}
+                    >
+                      <p className="text-xs uppercase tracking-widest mb-2" style={{ opacity: qty === o.qty ? 0.6 : 1 }}>
+                        {o.qty === 1 ? (isEn ? "Sample" : "Muestra") : o.qty === 3 ? (isEn ? "Monthly" : "Mensual") : (isEn ? "Quarterly" : "Trimestral")}
+                      </p>
+                      <p className="text-lg font-black" style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>
+                        {isEn ? `${o.qty} bag${o.qty > 1 ? "s" : ""}` : `${o.qty} bolsa${o.qty > 1 ? "s" : ""}`}
+                      </p>
+                      <p className="mt-1 text-sm">{o.servings} {isEn ? "servings" : "porciones"}</p>
+                      <p className="mt-3 text-xl font-semibold">${o.price}</p>
+                      {o.save && (
+                        <p className="mt-0.5 text-xs" style={{ opacity: 0.7 }}>
+                          {isEn ? `Save ${o.save}` : `Ahorra ${o.save}`}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Event-based suggestion */}
+              {ctx.eventDate && (() => {
+                const weeks = Math.max(0, Math.ceil((new Date(ctx.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)));
+                const suggestedBags = Math.max(1, Math.ceil(weeks * (answers.trainingHoursPerWeek / 14)));
+                return (
+                  <div className="mt-4 rounded-xl border border-line bg-surface-2 px-4 py-3">
+                    <p className="text-xs text-ink-2">
+                      {isEn
+                        ? `Your event is in ${weeks} weeks. Based on your training volume, we suggest ~${suggestedBags} bags.`
+                        : `Tu evento es en ${weeks} semanas. Según tu volumen de entrenamiento, sugerimos ~${suggestedBags} bolsas.`}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Price total */}
+              <div className="mt-8 rounded-2xl border border-line bg-surface p-6">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-ink-2">{isEn ? "Subtotal" : "Subtotal"}</span>
+                  <span className="text-2xl font-black text-ink" style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}>${selectedPrice.price}</span>
+                </div>
+                <p className="mt-1 text-xs text-ink-3">
+                  ${(selectedPrice.price / selectedPrice.servings).toFixed(2)}/{isEn ? "serving" : "porción"} · {isEn ? "Free shipping" : "Envío gratis"}
+                </p>
+                <div className="mt-6">
+                  {ordered ? (
+                    <div className="rounded-xl border border-line bg-surface-2 px-5 py-4 text-center">
+                      <p className="font-semibold text-ink">{isEn ? "Order received!" : "¡Pedido recibido!"}</p>
+                      <p className="mt-1 text-sm text-ink-3">
+                        {isEn ? "We’ll be in touch at" : "Te contactaremos en"} {answers.email}
+                      </p>
+                    </div>
+                  ) : (
+                    <Button className="w-full" onClick={() => setOrdered(true)}>
+                      {isEn ? `Order ${qty} bag${qty > 1 ? "s" : ""} — $${selectedPrice.price}` : `Pedir ${qty} bolsa${qty > 1 ? "s" : ""} — $${selectedPrice.price}`}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-between">
+                <Button variant="ghost" onClick={() => setStage("refine")}>
+                  {isEn ? "← Back" : "← Atrás"}
+                </Button>
+                <Link href="/assessment" className="text-xs text-ink-3 underline underline-offset-4 hover:text-ink-2">
+                  {isEn ? "Retake assessment" : "Repetir evaluación"}
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
   );
 }
 
-function PhaseCard({ title, metric, desc }: { title: string; metric: string; desc: string }) {
+function ProductBag({ flavor, isEn }: { flavor: typeof BRAND_FLAVORS[0]; isEn: boolean }) {
   return (
-    <div className="rounded-xl border border-line bg-surface-2 p-5">
-      <div className="flex items-baseline justify-between">
-        <p className="text-xs uppercase tracking-widest text-ink-3">{title}</p>
-        <p className="text-lg font-semibold text-ink">{metric}</p>
+    <div className="relative" style={{ width: 200, height: 300 }}>
+      <div
+        className="absolute inset-0 rounded-3xl overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg, #D0D0CE 0%, #EAEAE8 30%, #C0C0BE 60%, #DCDCDA 100%)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.6)",
+        }}
+      >
+        {/* Metallic sheen */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.35) 47%, transparent 55%)" }} />
+
+        {/* Content */}
+        <div className="relative flex flex-col items-center h-full pb-24 px-6 pt-9">
+          {/* Summit mark */}
+          <svg width="26" height="22" viewBox="0 0 26 22" fill="none">
+            <polyline points="13,2 24,20 2,20" stroke="#0B0B0C" strokeWidth="1.5" strokeLinejoin="round" />
+            <circle cx="13" cy="2" r="2.5" fill="#0B0B0C" />
+          </svg>
+
+          {/* Wordmark */}
+          <p className="mt-2 text-2xl font-black text-[#0B0B0C]" style={{ fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.03em" }}>
+            zenit
+          </p>
+          <p className="text-[7px] uppercase tracking-[0.5em] text-[#55565B] mt-0.5">nutrition</p>
+
+          <div className="mt-5 w-full border-t border-[#0B0B0C]/20" />
+
+          <p className="mt-5 text-sm font-bold uppercase tracking-[0.2em] text-[#0B0B0C]">
+            {isEn ? flavor.en : flavor.es}
+          </p>
+          <p className="mt-1 text-[9px] uppercase tracking-widest text-[#55565B]">33 g · 14 servings</p>
+          <p className="mt-0.5 text-[9px] uppercase tracking-widest text-[#55565B]">120 kcal · 30 g carbs</p>
+        </div>
+
+        {/* Flavor color panel */}
+        <div
+          className="absolute bottom-0 inset-x-0 h-24 rounded-b-3xl flex items-center justify-center"
+          style={{ background: flavor.color }}
+        >
+          <p className="text-xs font-bold uppercase tracking-widest text-white/95">
+            {isEn ? flavor.en : flavor.es}
+          </p>
+        </div>
       </div>
-      <p className="mt-3 text-sm text-ink-2 leading-relaxed">{desc}</p>
     </div>
   );
 }
 
-function MixSummary({ title, formula, isEn }: { title: string; formula: FormulaRecommendation; isEn: boolean }) {
-  const rows: [string, string][] = [
-    [isEn ? "Carbs" : "Carbos", `${formula.carbsPerServing}g`],
-    [isEn ? "Sodium" : "Sodio", `${formula.sodiumPerServing}mg`],
-    [isEn ? "Caffeine" : "Cafeína", `${formula.caffeinePerServing}mg`],
-    [isEn ? "Flavor" : "Sabor", formula.flavor.replace(/_/g, " ")],
-  ];
+function MiniProductBag({ flavor }: { flavor: typeof BRAND_FLAVORS[0] }) {
   return (
-    <div className="rounded-xl border border-line bg-surface-2 p-5">
-      <p className="text-sm font-semibold uppercase tracking-widest text-ink">{title}</p>
-      <dl className="mt-4 space-y-2">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between text-sm">
-            <dt className="text-ink-3">{k}</dt>
-            <dd className="capitalize text-ink-2">{v}</dd>
-          </div>
-        ))}
-      </dl>
+    <div className="relative" style={{ width: 80, height: 112 }}>
+      <div
+        className="absolute inset-0 rounded-xl overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg, #D0D0CE 0%, #EAEAE8 35%, #C8C8C6 100%)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+        }}
+      >
+        <div className="relative flex flex-col items-center justify-center h-full pb-8 pt-3 px-2">
+          <p className="text-[8px] font-black text-[#0B0B0C]" style={{ fontFamily: "JetBrains Mono, monospace" }}>zenit</p>
+          <p className="text-[5px] uppercase tracking-[0.4em] text-[#55565B]">nutrition</p>
+          <p className="mt-2 text-[7px] font-bold uppercase text-[#0B0B0C]" style={{ letterSpacing: "0.1em" }}>Peach</p>
+        </div>
+        <div className="absolute bottom-0 inset-x-0 h-8 rounded-b-xl" style={{ background: flavor.color }} />
+      </div>
     </div>
   );
 }

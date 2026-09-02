@@ -1,13 +1,28 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLocale } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardTitle } from "@/components/ui/card";
 
+const BRAND_FLAVORS = [
+  { key: "peach", en: "Peach", es: "Durazno", color: "#E8946A", note: { en: "Sweet · Natural", es: "Dulce · Natural" } },
+  { key: "kiwi", en: "Kiwi", es: "Kiwi", color: "#6BAF5E", note: { en: "Crisp · Tart", es: "Fresco · Ácido" } },
+  { key: "pineapple", en: "Pineapple", es: "Piña", color: "#E8C44A", note: { en: "Bright · Tropical", es: "Vivo · Tropical" } },
+  { key: "mango", en: "Mango", es: "Mango", color: "#E8A040", note: { en: "Rich · Exotic", es: "Rico · Exótico" } },
+];
+
 export default function Home() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const router = useRouter();
+  const isEn = locale === "en";
+
+  function selectFlavor(key: string) {
+    try { sessionStorage.setItem("zenit:flavor", key); } catch { /* ignore */ }
+    router.push("/assessment");
+  }
 
   return (
     <div className="flex flex-col flex-1 bg-bg">
@@ -42,8 +57,47 @@ export default function Home() {
         </div>
       </section>
 
+      {/* FLAVOR SELECTOR — request test product */}
+      <section className="border-t border-line px-6 py-28 bg-surface-2">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-xs uppercase tracking-[0.4em] text-ink-3">
+            {isEn ? "Free sample" : "Muestra gratuita"}
+          </p>
+          <h2
+            className="mt-5 text-3xl sm:text-5xl font-bold tracking-tight text-ink"
+            style={{ fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono', monospace)" }}
+          >
+            {isEn ? "Pick a flavor." : "Elige un sabor."}
+          </h2>
+          <p className="mt-4 text-sm text-ink-2 max-w-sm mx-auto leading-relaxed">
+            {isEn
+              ? "We build a formula tuned to your physiology. Free. No commitment."
+              : "Construimos una fórmula ajustada a tu fisiología. Gratis. Sin compromiso."}
+          </p>
+          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {BRAND_FLAVORS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => selectFlavor(f.key)}
+                className="group flex flex-col items-center gap-3 rounded-2xl border border-line bg-bg px-4 py-7 hover:border-ink transition-all hover:shadow-sm text-center"
+              >
+                <div
+                  className="h-11 w-11 rounded-full ring-1 ring-black/10 group-hover:scale-110 transition-transform"
+                  style={{ background: f.color }}
+                />
+                <span className="text-sm font-semibold text-ink">{isEn ? f.en : f.es}</span>
+                <span className="text-xs text-ink-3 leading-snug">{isEn ? f.note.en : f.note.es}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-8 text-xs text-ink-3">
+            {isEn ? "Kiwi · Mango · Piña are prototypes — final colors defined at launch." : "Kiwi · Mango · Piña son prototipos — colores finales al lanzamiento."}
+          </p>
+        </div>
+      </section>
+
       {/* WHY PERSONALIZATION MATTERS */}
-      <section className="border-t border-line px-6 py-24 bg-surface-2">
+      <section className="border-t border-line px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.why.title}</h2>
           <div className="mt-12 grid gap-5 sm:grid-cols-2">
@@ -58,7 +112,7 @@ export default function Home() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="border-t border-line px-6 py-24">
+      <section className="border-t border-line px-6 py-24 bg-surface-2">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.how.title}</h2>
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -73,7 +127,7 @@ export default function Home() {
       </section>
 
       {/* SCIENTIFIC APPROACH */}
-      <section className="border-t border-line px-6 py-24 bg-surface-2">
+      <section className="border-t border-line px-6 py-24">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink">{t.science.title}</h2>
           <p className="mt-5 text-ink-2 leading-relaxed">{t.science.body}</p>
@@ -81,7 +135,7 @@ export default function Home() {
       </section>
 
       {/* PERFORMANCE BENEFITS */}
-      <section className="border-t border-line px-6 py-24">
+      <section className="border-t border-line px-6 py-24 bg-surface-2">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.benefits.title}</h2>
           <ul className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -96,7 +150,7 @@ export default function Home() {
       </section>
 
       {/* TESTIMONIALS */}
-      <section className="border-t border-line px-6 py-24 bg-surface-2">
+      <section className="border-t border-line px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.testimonials.title}</h2>
           <div className="mt-12 grid gap-5 sm:grid-cols-3">
@@ -112,7 +166,7 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-line px-6 py-24">
+      <section className="border-t border-line px-6 py-24 bg-surface-2">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-center text-ink">{t.faq.title}</h2>
           <div className="mt-10 divide-y divide-line border-y border-line">
@@ -130,7 +184,7 @@ export default function Home() {
       </section>
 
       {/* FINAL CTA */}
-      <section className="border-t border-line px-6 py-28 text-center bg-surface-2">
+      <section className="border-t border-line px-6 py-28 text-center">
         <h2 className="mx-auto max-w-2xl text-2xl sm:text-4xl font-semibold tracking-tight leading-tight text-ink">
           {t.finalCta.title}
         </h2>

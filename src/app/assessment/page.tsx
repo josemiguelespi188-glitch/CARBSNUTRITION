@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/context";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -12,11 +12,19 @@ import { PhoneInput } from "@/components/PhoneInput";
 
 const todayISO = () => new Date().toISOString().split("T")[0];
 
-const FLAVORS = [
-  "unflavored", "blue_raspberry", "lemon_lime", "cherry", "pineapple", "kiwi",
-  "watermelon", "root_beer", "grape", "green_apple", "mixed_berry", "peach",
-  "tangerine_natural", "mango_natural", "cotton_candy_natural",
-];
+const FLAVOR_NAMES: Record<string, { en: string; es: string }> = {
+  peach: { en: "Peach", es: "Durazno" },
+  kiwi: { en: "Kiwi", es: "Kiwi" },
+  pineapple: { en: "Pineapple", es: "Piña" },
+  mango: { en: "Mango", es: "Mango" },
+};
+
+const FLAVOR_COLORS: Record<string, string> = {
+  peach: "#E8946A",
+  kiwi: "#6BAF5E",
+  pineapple: "#E8C44A",
+  mango: "#E8A040",
+};
 
 const initialAnswers: AssessmentAnswers = {
   name: "", email: "", phone: "+1 ",
@@ -35,7 +43,7 @@ const initialAnswers: AssessmentAnswers = {
 type Field<K extends keyof AssessmentAnswers> = {
   key: K;
   label: { en: string; es: string };
-  type: "text" | "email" | "phone" | "number" | "date" | "single" | "multi" | "multi-notes";
+  type: "text" | "email" | "phone" | "number" | "date" | "single" | "multi";
   options?: { value: string; label: { en: string; es: string } }[];
   showIf?: (a: AssessmentAnswers) => boolean;
 };
@@ -49,11 +57,6 @@ const sportOptions = [
   { value: "trail", label: { en: "Trail Running", es: "Trail Running" } },
   { value: "other", label: { en: "Other", es: "Otro" } },
 ];
-const goalOptions = [
-  { value: "race", label: { en: "Race", es: "Carrera" } },
-  { value: "training", label: { en: "Training", es: "Entrenamiento" } },
-  { value: "both", label: { en: "Both", es: "Ambos" } },
-];
 const toleranceOptions = [
   { value: "none", label: { en: "None", es: "Ninguna" } },
   { value: "low", label: { en: "Low", es: "Baja" } },
@@ -64,72 +67,62 @@ const yesNo = [
   { value: "yes", label: { en: "Yes", es: "Sí" } },
   { value: "no", label: { en: "No", es: "No" } },
 ];
-const caffeineGoalOptions = [
-  { value: "training_only", label: { en: "Training Mix Only", es: "Solo Mezcla de Entrenamiento" } },
-  { value: "race_only", label: { en: "Race Mix Only", es: "Solo Mezcla de Carrera" } },
-  { value: "both", label: { en: "Both (Training + Race)", es: "Ambas (Entrenamiento + Carrera)" } },
-];
-const nutritionStrategyOptions = [
-  { value: "water_only", label: { en: "Water only", es: "Solo agua" } },
-  { value: "sports_drink", label: { en: "Sports drink", es: "Bebida deportiva" } },
-  { value: "energy_gels", label: { en: "Energy gels", es: "Geles energéticos" } },
-  { value: "energy_chews", label: { en: "Energy chews", es: "Gomitas energéticas" } },
-  { value: "homemade", label: { en: "Homemade fuel", es: "Fuel casero" } },
-  { value: "carb_drink_mix", label: { en: "Carb drink mix", es: "Mezcla de carbohidratos" } },
-  { value: "no_fuel", label: { en: "No fuel", es: "Sin fuel" } },
-  { value: "other", label: { en: "Other", es: "Otro" } },
-];
 
 const fields: Field<keyof AssessmentAnswers>[] = [
   { key: "name", label: { en: "What's your name?", es: "¿Cuál es tu nombre?" }, type: "text" },
   { key: "email", label: { en: "Your email", es: "Tu correo electrónico" }, type: "email" },
   { key: "phone", label: { en: "Your phone number", es: "Tu número de teléfono" }, type: "phone" },
   { key: "sportType", label: { en: "What's your sport?", es: "¿Cuál es tu deporte?" }, type: "single", options: sportOptions },
-  { key: "eventName", label: { en: "What event are you training for?", es: "¿Para qué evento te estás preparando?" }, type: "text" },
-  { key: "eventDate", label: { en: "When is your event?", es: "¿Cuándo es tu evento?" }, type: "date" },
-  { key: "goal", label: { en: "Is this for a race, training, or both?", es: "¿Es para una carrera, entrenamiento o ambos?" }, type: "single", options: goalOptions },
-  { key: "trainingHoursPerWeek", label: { en: "How many hours do you train per week?", es: "¿Cuántas horas entrenas por semana?" }, type: "number" },
-  { key: "carbTargetPerHour", label: { en: "How many carbs (grams) do you currently aim for per hour of effort?", es: "¿Cuántos carbohidratos (gramos) buscas consumir por hora de esfuerzo actualmente?" }, type: "number" },
-  { key: "nutritionStrategyItems", label: { en: "What does your current fueling strategy include? (select all)", es: "¿Qué incluye tu estrategia de alimentación actual? (selecciona todo)" }, type: "multi-notes", options: nutritionStrategyOptions },
+  { key: "trainingHoursPerWeek", label: { en: "Hours of training per week?", es: "¿Horas de entrenamiento por semana?" }, type: "number" },
   { key: "caffeineConsumption", label: { en: "How much caffeine do you consume daily?", es: "¿Cuánta cafeína consumes diariamente?" }, type: "single", options: [
     { value: "none", label: { en: "None", es: "Nada" } },
     { value: "occasional", label: { en: "Occasional (1 cup or less)", es: "Ocasional (1 taza o menos)" } },
-    { value: "daily", label: { en: "Daily (2-3 cups)", es: "Diario (2-3 tazas)" } },
+    { value: "daily", label: { en: "Daily (2–3 cups)", es: "Diario (2–3 tazas)" } },
     { value: "heavy", label: { en: "Heavy (4+ cups)", es: "Alto (4+ tazas)" } },
   ] },
-  { key: "caffeineTolerance", label: { en: "How would you describe your caffeine tolerance?", es: "¿Cómo describirías tu tolerancia a la cafeína?" }, type: "single", options: toleranceOptions },
-  { key: "caffeineGoal", label: { en: "For which purpose do you want caffeine?", es: "¿Para qué propósito quieres cafeína?" }, type: "single", options: caffeineGoalOptions },
-  { key: "sweatRate", label: { en: "How would you describe your sweat rate?", es: "¿Cómo describirías tu tasa de sudoración?" }, type: "single", options: [
-    { value: "low", label: { en: "Low — I barely sweat", es: "Baja — casi no sudo" } },
-    { value: "medium", label: { en: "Medium — average sweater", es: "Media — sudo lo normal" } },
-    { value: "high", label: { en: "High — I sweat heavily / salt stains on clothes", es: "Alta — sudo mucho / manchas de sal en la ropa" } },
+  { key: "caffeineTolerance", label: { en: "Your caffeine tolerance?", es: "¿Tu tolerancia a la cafeína?" }, type: "single", options: toleranceOptions },
+  { key: "sweatRate", label: { en: "Your sweat rate?", es: "¿Tu tasa de sudoración?" }, type: "single", options: [
+    { value: "low", label: { en: "Low — barely sweat", es: "Baja — casi no sudo" } },
+    { value: "medium", label: { en: "Medium — average", es: "Media — normal" } },
+    { value: "high", label: { en: "High — heavy sweater / salt stains", es: "Alta — sudo mucho / manchas de sal" } },
   ] },
-  { key: "hotClimateTraining", label: { en: "Do you regularly train or race in hot/humid climates?", es: "¿Entrenas o compites regularmente en climas calurosos o húmedos?" }, type: "single", options: yesNo },
-  { key: "sodiumIssues", label: { en: "Have you experienced cramping or sodium-related issues?", es: "¿Has tenido calambres o problemas relacionados con el sodio?" }, type: "single", options: yesNo },
-  { key: "digestiveIssues", label: { en: "Do you experience digestive (GI) issues during training or racing?", es: "¿Tienes problemas digestivos durante tus entrenamientos o carreras?" }, type: "single", options: yesNo },
-  { key: "pastIssuesWithGels", label: { en: "Have gels caused you problems in the past?", es: "¿Los geles te han causado problemas en el pasado?" }, type: "single", options: yesNo, showIf: (a) => a.digestiveIssues === "yes" },
-  { key: "pastIssuesWithSportsDrinks", label: { en: "Have sports drinks caused you problems in the past?", es: "¿Las bebidas deportivas te han causado problemas en el pasado?" }, type: "single", options: yesNo, showIf: (a) => a.digestiveIssues === "yes" },
-  { key: "fructoseTolerance", label: { en: "How well do you tolerate fructose (fruit sugars)?", es: "¿Qué tan bien toleras la fructosa (azúcares de fruta)?" }, type: "single", options: [
+  { key: "hotClimateTraining", label: { en: "Do you train or race in hot/humid climates?", es: "¿Entrenas o compites en climas calurosos o húmedos?" }, type: "single", options: yesNo },
+  { key: "sodiumIssues", label: { en: "Had cramping or sodium-related issues?", es: "¿Has tenido calambres o problemas de sodio?" }, type: "single", options: yesNo },
+  { key: "digestiveIssues", label: { en: "GI (digestive) issues during training or racing?", es: "¿Problemas digestivos durante entrenos o carreras?" }, type: "single", options: yesNo },
+  { key: "pastIssuesWithGels", label: { en: "Have gels caused problems in the past?", es: "¿Los geles te han causado problemas?" }, type: "single", options: yesNo, showIf: (a) => a.digestiveIssues === "yes" },
+  { key: "pastIssuesWithSportsDrinks", label: { en: "Have sports drinks caused problems?", es: "¿Las bebidas deportivas te han causado problemas?" }, type: "single", options: yesNo, showIf: (a) => a.digestiveIssues === "yes" },
+  { key: "fructoseTolerance", label: { en: "How well do you tolerate fructose (fruit sugars)?", es: "¿Qué tan bien toleras la fructosa?" }, type: "single", options: [
     { value: "low", label: { en: "Low — fruit upsets my stomach", es: "Baja — la fruta me cae mal" } },
     { value: "normal", label: { en: "Normal", es: "Normal" } },
-    { value: "high", label: { en: "High — no issues at all", es: "Alta — no tengo ningún problema" } },
+    { value: "high", label: { en: "High — no issues at all", es: "Alta — no tengo problemas" } },
   ] },
-  { key: "sugarSensitivity", label: { en: "Do you have any sugar sensitivity?", es: "¿Tienes alguna sensibilidad al azúcar?" }, type: "single", options: yesNo },
-  { key: "diabetes", label: { en: "Do you have diabetes or pre-diabetes?", es: "¿Tienes diabetes o prediabetes?" }, type: "single", options: yesNo },
-  { key: "preferredSweetness", label: { en: "What's your preferred sweetness level?", es: "¿Cuál es tu nivel de dulzor preferido?" }, type: "single", options: [
+  { key: "sugarSensitivity", label: { en: "Any sugar sensitivity?", es: "¿Alguna sensibilidad al azúcar?" }, type: "single", options: yesNo },
+  { key: "diabetes", label: { en: "Diabetes or pre-diabetes?", es: "¿Diabetes o prediabetes?" }, type: "single", options: yesNo },
+  { key: "preferredSweetness", label: { en: "Preferred sweetness level?", es: "¿Nivel de dulzor preferido?" }, type: "single", options: [
     { value: "light", label: { en: "Light", es: "Ligero" } },
     { value: "regular", label: { en: "Regular", es: "Regular" } },
     { value: "intense", label: { en: "Intense", es: "Intenso" } },
   ] },
-  { key: "flavorPreferences", label: { en: "Pick your favorite flavors (choose up to 3)", es: "Elige tus sabores favoritos (hasta 3)" }, type: "multi", options: FLAVORS.map((f) => ({ value: f, label: { en: f.replace(/_/g, " "), es: f.replace(/_/g, " ") } })) },
 ];
 
 export default function AssessmentPage() {
   const { locale } = useLocale();
   const router = useRouter();
+  const isEn = locale === "en";
   const [answers, setAnswers] = useState<AssessmentAnswers>(initialAnswers);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [preFlavorKey, setPreFlavorKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const f = sessionStorage.getItem("zenit:flavor");
+      if (f) {
+        setPreFlavorKey(f);
+        setAnswers(prev => ({ ...prev, flavorPreferences: [f] }));
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const visibleFields = useMemo(
     () => fields.filter((f) => !f.showIf || f.showIf(answers)),
@@ -146,9 +139,8 @@ export default function AssessmentPage() {
   function isValid(): boolean {
     if (!current) return true;
     const value = answers[current.key];
-    if (current.type === "multi" || current.type === "multi-notes") return Array.isArray(value);
-    if (current.type === "number") return typeof value === "number" && !Number.isNaN(value);
-    if (current.key === "eventName" || current.key === "eventDate") return true;
+    if (current.type === "multi") return Array.isArray(value);
+    if (current.type === "number") return typeof value === "number" && !Number.isNaN(value) && (value as number) > 0;
     return value !== "" && value !== undefined && value !== null;
   }
 
@@ -181,24 +173,36 @@ export default function AssessmentPage() {
       <SiteHeader />
       <main className="flex flex-1 flex-col items-center justify-center px-6 pt-28 pb-16">
         <div className="w-full max-w-xl">
+
+          {/* Pre-selected flavor banner */}
+          {preFlavorKey && FLAVOR_NAMES[preFlavorKey] && (
+            <div className="mb-6 flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
+              <div className="h-6 w-6 rounded-full shrink-0" style={{ background: FLAVOR_COLORS[preFlavorKey] }} />
+              <p className="text-sm text-ink-2">
+                {isEn ? "Flavor selected:" : "Sabor seleccionado:"}
+                {" "}<span className="font-medium text-ink">{isEn ? FLAVOR_NAMES[preFlavorKey].en : FLAVOR_NAMES[preFlavorKey].es}</span>
+              </p>
+            </div>
+          )}
+
           <div className="mb-8 h-1 w-full overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full bg-accent-1 transition-all duration-300" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-ink transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
           <p className="mb-2 text-xs uppercase tracking-[0.3em] text-ink-3">
-            {locale === "en" ? `Step ${step + 1} of ${visibleFields.length}` : `Paso ${step + 1} de ${visibleFields.length}`}
+            {isEn ? `Step ${step + 1} of ${visibleFields.length}` : `Paso ${step + 1} de ${visibleFields.length}`}
           </p>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink">{current.label[locale]}</h1>
           <div className="mt-8">
-            <FieldInput field={current} answers={answers} onChange={(v) => update(current.key, v as never)} onUpdate={update} locale={locale} />
+            <FieldInput field={current} answers={answers} onChange={(v) => update(current.key, v as never)} locale={locale} />
           </div>
           <div className="mt-10 flex items-center justify-between">
             <Button variant="ghost" onClick={handleBack} disabled={step === 0}>
-              {locale === "en" ? "Back" : "Atrás"}
+              {isEn ? "Back" : "Atrás"}
             </Button>
             <Button onClick={handleNext} disabled={!isValid() || submitting}>
               {step === visibleFields.length - 1
-                ? (submitting ? (locale === "en" ? "Building your formula…" : "Construyendo tu fórmula…") : (locale === "en" ? "Get My Formula" : "Obtener mi Fórmula"))
-                : (locale === "en" ? "Next" : "Siguiente")}
+                ? (submitting ? (isEn ? "Building your formula…" : "Construyendo tu fórmula…") : (isEn ? "Get My Formula" : "Obtener mi Fórmula"))
+                : (isEn ? "Next" : "Siguiente")}
             </Button>
           </div>
         </div>
@@ -208,22 +212,17 @@ export default function AssessmentPage() {
 }
 
 function FieldInput({
-  field, answers, onChange, onUpdate, locale,
+  field, answers, onChange, locale,
 }: {
   field: Field<keyof AssessmentAnswers>;
   answers: AssessmentAnswers;
   onChange: (v: unknown) => void;
-  onUpdate: <K extends keyof AssessmentAnswers>(key: K, value: AssessmentAnswers[K]) => void;
   locale: "en" | "es";
 }) {
   const value = answers[field.key];
   const inputClasses = "w-full rounded-xl border border-line bg-surface px-4 py-3 text-base text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none transition-colors";
 
   if (field.type === "phone") return <PhoneInput value={(value as string) ?? ""} onChange={(v) => onChange(v)} locale={locale} />;
-
-  if (field.type === "date") return (
-    <input type="date" min={todayISO()} className={inputClasses} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />
-  );
 
   if (field.type === "text" || field.type === "email") return (
     <input type={field.type} className={inputClasses} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={locale === "en" ? "Type your answer…" : "Escribe tu respuesta…"} />
@@ -246,31 +245,22 @@ function FieldInput({
     </div>
   );
 
-  if (field.type === "multi" || field.type === "multi-notes") {
+  if (field.type === "multi") {
     const selected = (value as string[]) ?? [];
-    const isStrategy = field.type === "multi-notes";
-    const maxLimit = isStrategy ? Infinity : 3;
     return (
-      <div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {field.options?.map((opt) => {
-            const active = selected.includes(opt.value);
-            return (
-              <button key={opt.value} type="button"
-                onClick={() => { if (active) onChange(selected.filter((v) => v !== opt.value)); else if (selected.length < maxLimit) onChange([...selected, opt.value]); }}
-                className={`rounded-xl border px-3 py-2.5 text-left text-xs capitalize transition-colors ${
-                  active ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"
-                }`}>
-                {opt.label[locale]}
-              </button>
-            );
-          })}
-        </div>
-        {isStrategy && (
-          <input type="text" className={`${inputClasses} mt-4`} value={answers.nutritionStrategyNotes}
-            onChange={(e) => onUpdate("nutritionStrategyNotes", e.target.value)}
-            placeholder={locale === "en" ? "Any extra notes (optional)…" : "Notas adicionales (opcional)…"} />
-        )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {field.options?.map((opt) => {
+          const active = selected.includes(opt.value);
+          return (
+            <button key={opt.value} type="button"
+              onClick={() => { if (active) onChange(selected.filter((v) => v !== opt.value)); else if (selected.length < 3) onChange([...selected, opt.value]); }}
+              className={`rounded-xl border px-3 py-2.5 text-left text-xs capitalize transition-colors ${
+                active ? "border-ink bg-ink text-bg font-medium" : "border-line text-ink-2 hover:border-ink-2"
+              }`}>
+              {opt.label[locale]}
+            </button>
+          );
+        })}
       </div>
     );
   }
