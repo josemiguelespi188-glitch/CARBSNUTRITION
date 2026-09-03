@@ -106,3 +106,36 @@ export interface RaceDayFuelingPlan {
   run?: { carbsPerHour: number; description: { en: string; es: string } };
   recovery: { carbs: number; description: { en: string; es: string } };
 }
+
+// --- Addendum types ---
+
+export interface QuantityExtras {
+  raceGoalHours: number;
+  raceGoalHasTarget: boolean;
+  fueledDisciplines: string[];
+}
+
+export interface RaceDayAnswers {
+  carbsPerHourRace: number;
+  raceClimate: "temperate" | "hot_humid" | "hot_dry" | "cold";
+  swimMinutes: number;
+  bikeMinutes: number;
+  runMinutes: number;
+  hasAidStations: "yes" | "no";
+}
+
+export interface RaceNutritionPlan {
+  segments: RaceSegment[];
+  totalCarbs: number;
+  totalServings: number;
+  generatedAt: string;
+}
+
+export interface RaceSegment {
+  label: { en: string; es: string };
+  durationMinutes: number;
+  carbsTotal: number;
+  servings: number;
+  includeCaffeine: boolean;
+  notes: { en: string; es: string };
+}
