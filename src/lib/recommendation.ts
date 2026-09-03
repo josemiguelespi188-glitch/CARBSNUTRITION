@@ -88,6 +88,20 @@ export function buildRecommendation(a: AssessmentAnswers): FormulaRecommendation
     },
   });
 
+  // ---- CALCIUM ----
+  // tied to sweatRate + trainingHoursPerWeek
+  let calciumBase = 75; // product default
+  if (a.sweatRate === "high" || (a.trainingHoursPerWeek ?? 8) >= 12) calciumBase = 112;
+  if (a.sweatRate === "low" && (a.trainingHoursPerWeek ?? 8) < 8) calciumBase = 37;
+  const calciumPerServing = [0, 37, 75, 112].reduce((c, s) => Math.abs(s - calciumBase) < Math.abs(c - calciumBase) ? s : c, 75) as 0 | 37 | 75 | 112;
+
+  // ---- MAGNESIUM ----
+  // tied to sweatRate + sodiumIssues (cramping history)
+  let magnesiumBase = 37; // product default
+  if (a.sweatRate === "high" && a.sodiumIssues === "yes") magnesiumBase = 55;
+  if (a.sweatRate === "low" && a.sodiumIssues === "no") magnesiumBase = 18;
+  const magnesiumPerServing = [0, 18, 37, 55].reduce((c, s) => Math.abs(s - magnesiumBase) < Math.abs(c - magnesiumBase) ? s : c, 37) as 0 | 18 | 37 | 55;
+
   // ---- CAFFEINE ----
   let caffeineBase = 0;
   if (a.caffeineTolerance === "low") caffeineBase = 25;
@@ -165,6 +179,8 @@ export function buildRecommendation(a: AssessmentAnswers): FormulaRecommendation
     sodiumPerServing,
     ratio,
     caffeinePerServing,
+    calciumPerServing,
+    magnesiumPerServing,
     preservatives: "yes",
     scooper: "yes",
     reasoning,

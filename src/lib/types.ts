@@ -28,6 +28,11 @@ export interface AssessmentAnswers {
   eventName: string;
   eventDate: string; // ISO date
 
+  // New identity fields
+  age?: number;
+  personalBest?: string;
+  raceDistance?: string;
+
   // Physiology & tolerances
   caffeineTolerance: Tolerance;
   caffeineConsumption: "none" | "occasional" | "daily" | "heavy";
@@ -61,6 +66,8 @@ export interface FormulaRecommendation {
   sodiumPerServing: 200 | 400 | 600 | 800 | 1000;
   ratio: MaltoFructoseRatio;
   caffeinePerServing: 0 | 25 | 50 | 75 | 100;
+  calciumPerServing?: 0 | 37 | 75 | 112;
+  magnesiumPerServing?: 0 | 18 | 37 | 55;
   preservatives: YesNo;
   scooper: YesNo;
   reasoning: ReasoningEntry[];
@@ -138,4 +145,10 @@ export interface RaceSegment {
   servings: number;
   includeCaffeine: boolean;
   notes: { en: string; es: string };
+}
+
+export interface NextGoal {
+  raceName: string;
+  eventDate: string;
+  raceDistance: string;
 }
