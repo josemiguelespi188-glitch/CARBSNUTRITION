@@ -42,7 +42,7 @@ const DEFAULT_ANSWERS: AssessmentAnswers = {
   pastIssuesWithGels: "no", pastIssuesWithSportsDrinks: "no",
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────────────────
 
 function estimateRaceHours(sportType: string): number {
   const d: Record<string, number> = {
@@ -120,7 +120,7 @@ function getRacePackPrice(totalServings: number): number {
   return Math.round(tier.price * 0.7);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Sub-components ─────────────────────────────────────────────────────────────────────────────
 
 // FlipBag: ziplog SVG bag, front=flavor, back=live nutrition label
 function FlipBag({ flavor, mix, isEn, defaultFlipped = false }: {
@@ -150,8 +150,8 @@ function FlipBag({ flavor, mix, isEn, defaultFlipped = false }: {
     [isEn ? "Protein" : "Proteína",        "0 g"],
     [isEn ? "Sodium" : "Sodio",            `${mix.sodiumPerServing} mg`],
     ["Potasio",                             "134 mg"],
-    ["Calcio",                              "75 mg"],
-    ["Magnesio",                            "37 mg"],
+    ["Calcio",                              `${mix.calciumPerServing ?? 75} mg`],
+    ["Magnesio",                            `${mix.magnesiumPerServing ?? 37} mg`],
     ...(mix.caffeinePerServing > 0
       ? [[isEn ? "Caffeine" : "Cafeína", `${mix.caffeinePerServing} mg`] as [string, string]]
       : []),
@@ -283,7 +283,7 @@ function EF({ label, value, onDec, onInc, warn }: {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────────────────
 
 export default function MixPage() {
   const { locale } = useLocale();
@@ -417,7 +417,7 @@ export default function MixPage() {
     );
   }
 
-  // ── FORMULA ──────────────────────────────────────────────────────────────────
+  // ── FORMULA ─────────────────────────────────────────────────────────────────────────────
   if (stage === "formula") {
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--ink)" }}>
@@ -491,7 +491,7 @@ export default function MixPage() {
     );
   }
 
-  // ── REFINE ───────────────────────────────────────────────────────────────────
+  // ── REFINE ─────────────────────────────────────────────────────────────────────────────
   if (stage === "refine") {
     const warnings = mix.warnings ?? [];
     return (
@@ -630,7 +630,7 @@ export default function MixPage() {
     );
   }
 
-  // ── QUANTITY — INTAKE STEP ────────────────────────────────────────────────────
+  // ── QUANTITY — INTAKE STEP ──────────────────────────────────────────────────────────────────────────
   if (stage === "quantity" && (quantityStep === "intake" && !quantityExtras)) {
     const isMulti = answers.sportType === "ironman" || answers.sportType === "triathlon";
     const DISCS = [
@@ -710,7 +710,7 @@ export default function MixPage() {
     );
   }
 
-  // ── QUANTITY — MAIN STEP ──────────────────────────────────────────────────────
+  // ── QUANTITY — MAIN STEP ──────────────────────────────────────────────────────────────────────────
   if (stage === "quantity") {
     const extras = quantityExtras ?? { raceGoalHours: estimateRaceHours(answers.sportType), raceGoalHasTarget: false, fueledDisciplines: ["run"] };
     const fueledHours = raceFueledHours(extras, answers.sportType);
@@ -994,7 +994,7 @@ export default function MixPage() {
     );
   }
 
-  // ── ORDER ─────────────────────────────────────────────────────────────────────
+  // ── ORDER ─────────────────────────────────────────────────────────────────────────────
   const priceOpt2 = PRICE_OPTIONS.find(p => p.qty === qty) ?? PRICE_OPTIONS[1];
   const racePackPrice2 = racePlan ? getRacePackPrice(racePlan.totalServings) : 18;
   const orderTotal2 = priceOpt2.price + (racePack ? racePackPrice2 : 0);
