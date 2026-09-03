@@ -56,8 +56,6 @@ export default function PerfilPage() {
   const eventDate = answers?.eventDate ? new Date(answers.eventDate) : null;
   const today = new Date();
   const daysToEvent = eventDate ? Math.max(0, Math.floor((eventDate.getTime() - today.getTime()) / 86400000)) : null;
-
-  // Reorder nudge: show when event is within 28 days
   const showReorderNudge = daysToEvent !== null && daysToEvent <= 28 && !racePlan;
 
   return (
@@ -65,7 +63,6 @@ export default function PerfilPage() {
       <SiteHeader />
       <main className="flex-1 px-6 pt-28 pb-24">
         <div className="mx-auto max-w-3xl">
-          {/* Header: name + countdown */}
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-ink-3">{isEn ? "My profile" : "Mi perfil"}</p>
@@ -76,7 +73,8 @@ export default function PerfilPage() {
                 </h1>
                 {daysToEvent !== null && (
                   <div className="mb-1 flex items-baseline gap-1">
-                    <span className="text-3xl font-black leading-none" style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)", color: daysToEvent <= 14 ? "#E8946A" : "var(--ink)" }}>
+                    <span className="text-3xl font-black leading-none"
+                      style={{ fontFamily: "var(--font-jetbrains-mono,'JetBrains Mono',monospace)", color: daysToEvent <= 14 ? "#E8946A" : "var(--ink)" }}>
                       {daysToEvent}
                     </span>
                     <span className="text-xs uppercase tracking-widest text-ink-3">
@@ -91,11 +89,17 @@ export default function PerfilPage() {
                   {isEn ? `until ${answers.eventName}` : `para ${answers.eventName}`}
                 </p>
               )}
+              {(answers?.eventName || answers?.eventDate) && (
+                <p className="text-sm mt-3 italic" style={{ color: "var(--ink-2)" }}>
+                  {isEn
+                    ? `We're here to help make ${answers?.eventName || "your next race"} your best race yet. You've got this.`
+                    : `Estamos aquí para ayudarte a que ${answers?.eventName || "tu próxima carrera"} sea tu mejor carrera. Vas a ir increíble.`}
+                </p>
+              )}
             </div>
             <Link href="/mix"><Button variant="ghost" size="sm">{isEn ? "Edit formula" : "Editar fórmula"}</Button></Link>
           </div>
 
-          {/* Reorder nudge */}
           {showReorderNudge && (
             <div className="mt-6 rounded-2xl p-4 flex items-center justify-between gap-4"
               style={{ background: "#E8946A11", border: "2px solid #E8946A" }}>
@@ -113,7 +117,6 @@ export default function PerfilPage() {
             </div>
           )}
 
-          {/* Current mix */}
           {mix ? (
             <section className="mt-10">
               <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">{isEn ? "Your formula" : "Tu fórmula"}</p>
@@ -155,7 +158,6 @@ export default function PerfilPage() {
             </section>
           )}
 
-          {/* Race Day Plan */}
           {racePlan && (
             <section className="mt-10">
               <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">{isEn ? "Race Day Plan" : "Plan de Carrera"}</p>
@@ -197,7 +199,6 @@ export default function PerfilPage() {
             </section>
           )}
 
-          {/* Athlete profile */}
           {answers && (
             <section className="mt-10">
               <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">{isEn ? "Athlete profile" : "Perfil del atleta"}</p>
@@ -210,6 +211,7 @@ export default function PerfilPage() {
                     [isEn ? "Caffeine tol." : "Tolerancia caf.", answers.caffeineTolerance],
                     [isEn ? "Carb target" : "Objetivo carbs", `${answers.carbTargetPerHour}g/hr`],
                     [isEn ? "Goal" : "Objetivo", answers.goal],
+                    ...(answers.personalBest ? [["PR", answers.personalBest]] : []),
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k}>
                       <p className="text-[10px] uppercase tracking-widest text-ink-3">{k}</p>
@@ -226,14 +228,14 @@ export default function PerfilPage() {
                     )}
                   </div>
                 )}
-                <div className="mt-5">
-                  <Link href="/mix"><Button variant="ghost" size="sm">{isEn ? "Update profile" : "Actualizar perfil"}</Button></Link>
+                <div className="mt-5 flex gap-3">
+                  <Link href="/atleta"><Button variant="ghost" size="sm">{isEn ? "Full profile →" : "Perfil completo →"}</Button></Link>
+                  <Link href="/assessment"><Button variant="ghost" size="sm">{isEn ? "Update" : "Actualizar"}</Button></Link>
                 </div>
               </div>
             </section>
           )}
 
-          {/* Orders */}
           <section className="mt-10">
             <p className="text-xs uppercase tracking-widest text-ink-3 mb-4">{isEn ? "Orders" : "Pedidos"}</p>
             <div className="rounded-2xl border border-line bg-surface-2 p-8 text-center">
