@@ -250,7 +250,7 @@ export default function AssessmentPage() {
         ].map(f => (
           <div key={f.k} className="mb-4">
             <label className="text-xs block mb-1" style={{ color: "var(--ink-3)" }}>{f.label}</label>
-            <input type={f.type} value={(answers as Record<string,string>)[f.k]}
+            <input type={f.type} value={(answers as unknown as Record<string,string>)[f.k]}
               onChange={e => upd(f.k as keyof AssessmentAnswers, e.target.value as never)}
               placeholder={f.ph}
               className="w-full px-3 py-2 rounded-lg text-sm"
